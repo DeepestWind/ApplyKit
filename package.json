@@ -29,7 +29,7 @@
     "verify": "npm run typecheck && npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {
-    "zod": "^3.23.8"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
