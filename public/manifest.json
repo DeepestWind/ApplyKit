@@ -3,10 +3,22 @@
   "name": "投简助手 ApplyKit",
   "version": "0.1.0",
   "description": "使用本地履历填写招聘表单，校验结果并管理投递记录。",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
   "permissions": ["activeTab", "scripting", "storage"],
   "action": {
     "default_title": "投简助手",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
   },
   "background": {
     "service_worker": "background.js",

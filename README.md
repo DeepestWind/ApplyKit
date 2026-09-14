@@ -1,131 +1,201 @@
-# 投简助手 ApplyKit
+<p align="center">
+  <img src="public/icons/icon-128.png" width="112" height="112" alt="投简助手 ApplyKit 图标">
+</p>
 
-一个 Chrome Manifest V3 扩展：维护一份本地履历，在招聘网页上批量填写表单，回读校验结果，修正不认识的字段并记住规则，同时管理投递记录。
+<h1 align="center">投简助手 ApplyKit</h1>
 
-**这个扩展不会替你提交申请。** 附件、声明、验证码和最终提交按钮一律交给你自己操作；只有在你确认「已手动提交并看到网站成功提示」之后，记录才会变成「已投递」。
+<p align="center">
+  用一份保存在本机的履历，辅助填写不同招聘网站的在线表单。
+</p>
 
-运行时不调用任何模型、不连接服务器、没有账号。履历、规则和投递记录都保存在 `chrome.storage.local` 里。
+<p align="center">
+  <a href="https://github.com/DeepestWind/ApplyKit/actions/workflows/ci.yml"><img src="https://github.com/DeepestWind/ApplyKit/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/DeepestWind/ApplyKit" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white" alt="Chrome Manifest V3">
+  <img src="https://img.shields.io/badge/data-local%20only-147A45" alt="Data stays local">
+</p>
 
----
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="docs/用户使用教程.md">完整教程</a> ·
+  <a href="docs/SITE-COMPATIBILITY.md">兼容性记录</a> ·
+  <a href="CONTRIBUTING.md">参与贡献</a>
+</p>
 
-## 1. 环境
+ApplyKit 是一个开源 Chrome 扩展。它读取你主动保存在扩展里的履历，识别当前招聘页面的字段，填写可以可靠匹配的内容，并把不确定的部分交还给你确认。
 
-- Node.js（开发时实测版本：**v24.9.0**）与随附的 npm 11.6.0
-- Chrome（支持 Manifest V3 的版本即可）
-- 自动化测试使用 Playwright 自带的 Chromium（实测 Playwright 1.63.0 / Chromium 153），不会修改你日常使用的 Chrome 配置
+**扩展不会替你提交申请。** 附件、声明、验证码和最终提交按钮始终由你操作。只有在你确认网站已经提交成功后，ApplyKit 才会把本地记录标为“已投递”。
 
-## 2. 复现步骤
+> 当前版本为 `0.1.0`，尚未发布到 Chrome Web Store，需要从源码构建并在开发者模式下加载。
+
+## 为什么使用 ApplyKit
+
+| 能力 | 具体行为 |
+| --- | --- |
+| 一份履历，多站复用 | 姓名、联系方式、教育、实习、项目、获奖、语言等资料集中维护并带版本记录 |
+| 识别招聘表单 | 根据字段标签、分区、控件类型和经历位置建立填写计划 |
+| 处理复杂控件 | 支持普通输入、单选、多选、自定义下拉、日期范围、至今、地区选择和动态新增经历 |
+| 站点适配 | 为 Moka、北森 Phoenix、飞书招聘 ATSX 提供专用适配器，未知网站使用通用模式 |
+| 写入后校验 | 每次填写都会回读页面状态，区分已填写、原值相同、保留原值、待处理和失败 |
+| 记住陌生字段 | 你可以手动指定字段对应关系，并将可靠规则保存在本机供下次复用 |
+| 管理投递记录 | 保存公司、岗位、状态、下一步和备注，支持筛选与 CSV 导入导出 |
+| 完整备份 | 履历、字段规则和投递记录可导出为 JSON，并可整库恢复 |
+
+ApplyKit 的策略是“能确认才填写”：
+
+- 页面已经有不同内容时默认保留，除非你明确允许覆盖。
+- 多个候选都可能正确时停止并列为待处理。
+- 履历缺少事实时不编造答案。
+- 身份证号、精确住址、健康状况和家庭联系人等敏感字段不自动填写。
+- 不绕过验证码，不点击最终提交按钮。
+
+## 快速开始
+
+### 1. 构建扩展
+
+需要 [Node.js](https://nodejs.org/) `22.12+`、`24.x` 或 `26+`，以及支持 Manifest V3 的 Chrome。
 
 ```bash
+git clone https://github.com/DeepestWind/ApplyKit.git
+cd ApplyKit
 npm ci
+npm run build
 ```
 
-```bash
-npx playwright install chromium
-```
+构建完成后会生成 `dist/`。
 
-```bash
-npm run verify
-```
+### 2. 加载到 Chrome
+
+1. 在地址栏打开 `chrome://extensions`。
+2. 开启右上角的“开发者模式”。
+3. 点击“加载已解压的扩展程序”。
+4. 选择项目中的 `dist/` 目录。
+5. 在浏览器工具栏的扩展菜单中固定“投简助手 ApplyKit”。
+
+请选择 `dist/`，不要选择项目根目录或 `.test-dist/`。
+
+### 3. 用虚构资料完成五分钟演示
 
 ```bash
 npm run demo
 ```
 
-`npm run verify` 依次执行类型检查、单元测试、生产构建、测试构建与真实扩展端到端测试。
-`npm run demo` 在 `http://127.0.0.1:4173` 启动本地演示服务器，只提供 `demo/` 目录与两个明确虚构的样例文件。
+保持终端运行，然后：
 
-## 3. 在 Chrome 中安装
+1. 点击扩展图标，进入“履历管理”。
+2. 导入 [`fixtures/profile.demo.json`](fixtures/profile.demo.json)。这份资料明确标记为虚构，只能用于本地演示页。
+3. 打开 [基础表单演示](http://127.0.0.1:4173/basic.html)，点击扩展图标并选择“一键填写”。
+4. 继续体验 [多段经历](http://127.0.0.1:4173/experience.html) 和 [字段规则学习](http://127.0.0.1:4173/edge-cases.html)。
 
-1. 运行 `npm run build`，生成 `dist/`。
-2. 打开 `chrome://extensions`，右上角开启「开发者模式」。
-3. 点击「加载已解压的扩展程序」，选择本项目的 `dist/` 目录。
-4. 点击工具栏上的「投简助手」图标即可打开弹窗。
+更完整的安装、真实履历准备和演示步骤见[用户使用教程](docs/用户使用教程.md)。
 
-生产包只申请三个权限：`activeTab`、`scripting`、`storage`。它没有 `<all_urls>`、`tabs`、`cookies`、`downloads` 等权限，因此**必须由你点击工具栏图标**来临时授权当前页面；跨站点跳转后需要重新点击。
+## 日常使用流程
 
-## 4. 五分钟演示
+```mermaid
+flowchart LR
+  A[导入并选中履历] --> B[打开招聘表单]
+  B --> C[扫描页面]
+  C --> D[一键填写]
+  D --> E[核对结果并处理空白]
+  E --> F[手动上传附件与提交]
+  F --> G[确认成功并更新投递记录]
+```
 
-先执行 `npm run demo`，然后：
+每次切换到新的招聘网页，都需要再次点击工具栏图标。`activeTab` 只会临时授权当前标签页，跨站跳转后不会继续保留访问权。
 
-1. 打开扩展工作台（弹窗里的「履历管理」），导入 `fixtures/profile.demo.json`。导入预览会明确标出这是**虚构资料**。
-2. 打开 `http://127.0.0.1:4173/basic.html`，点击扩展图标 → 「一键填写」。观察页面右下角「页面实际接收到的数据」面板：数值来自演示页自己的事件监听器。
-3. 打开 `http://127.0.0.1:4173/experience.html` 填写：两段教育各就各位，年月分开填写，第二段项目由扩展点击页面自己的「新增项目经历」按钮后填入。
-4. 打开 `http://127.0.0.1:4173/edge-cases.html` 填写：「联系信箱入口」第一次是待处理；在结果页把它对应到「邮箱」并勾选记住；清空表单再次填写就会自动命中。
-   打开 `http://127.0.0.1:4173/ats-style.html` 可以看到国内 ATS 的通用形态；`moka-style.html`、`beisen-style.html` 和 `feishu-style.html` 分别复刻 Moka、北森 Phoenix 与飞书招聘 ATSX 的重复经历和选择控件。
-5. 同一页面上还能看到：日期精度不足、声明勾选、附件、iframe 等都停在待处理。
-6. 在「投递记录」里核对公司与岗位后保存记录；在演示页点击「提交演示申请」，看到页面自己的成功提示后，再回到扩展点击「我已手动提交并看到成功提示」。
-7. 在记录页筛选状态、修改下一步、导出 CSV；在「备份」页导出完整备份。
+真实投递前建议先使用“扫描页面”查看识别结果，再运行“一键填写”。填写结束后仍应逐项核对，尤其是意向城市、日期、学校候选和网站已有内容。
 
-## 5. 修改代码后如何重新加载
+## 网站兼容性
+
+| 页面类型 | 当前状态 |
+| --- | --- |
+| Moka 校招在线简历 | 专用适配器；支持重复经历、自定义下拉、学校/专业和年月选择 |
+| 北森招聘云 Phoenix | 专用适配器；支持 portal 下拉、省市弹窗、日期和动态教育字段 |
+| 飞书招聘 ATSX | 专用适配器；支持树形地区、双端年月、动态经历和自我评价 |
+| 标准 HTML / 常见 ARIA 表单 | 通用扫描与安全填写 |
+| 未验证的私有组件 | 能识别的字段会处理，其余项保留为待处理 |
+
+同一种招聘系统也可能因公司配置和版本不同而出现新的控件结构。真实页面的验证范围、日期和已知差异记录在 [`docs/SITE-COMPATIBILITY.md`](docs/SITE-COMPATIBILITY.md)。
+
+当前仍需人工处理的典型内容：
+
+- 简历附件、证件照、作品集文件和其他上传项。
+- 隐私声明、承诺书、验证码和最终提交。
+- 履历中缺失、存在歧义或需要本人判断的信息。
+- iframe、Shadow DOM、虚拟滚动列表、富文本编辑器及未验证的多级联动控件。
+
+## 数据与隐私
+
+ApplyKit 没有账号、服务器、统计 SDK、广告或运行时模型调用。履历、规则和投递记录保存在 `chrome.storage.local` 中。
+
+| 权限 | 用途 |
+| --- | --- |
+| `activeTab` | 仅在你点击扩展后访问当前招聘页面 |
+| `scripting` | 注入页面扫描、填写和回读校验逻辑 |
+| `storage` | 在本机保存履历、映射规则、运行结果和投递记录 |
+
+扩展不申请 `<all_urls>`、`tabs`、`cookies` 或 `downloads`。卸载扩展会删除浏览器中的本地数据；请定期从“备份”页导出完整备份。备份文件是明文 JSON，应按个人敏感资料妥善保存。
+
+详细说明见[隐私政策](PRIVACY.md)和[安全政策](SECURITY.md)。
+
+## 修改代码与验证
+
+源码修改后重新构建：
 
 ```bash
 npm run build
 ```
 
-然后在 `chrome://extensions` 点击该扩展的「重新加载」，并**刷新目标招聘页面**（内容脚本需要重新注入）。开发时也可以用 `npm run dev` 持续构建，但它不会自动刷新 Chrome。
-
-不要反复卸载重装：保持同一个安装目录和扩展身份，本地数据才不会丢。
-
-## 6. 数据与备份
-
-- 全部数据保存在扩展的本地存储里，**卸载扩展会一并删除**。
-- 工作台「备份」页可以导出完整备份（明文 JSON，保存在你自己的电脑上，不上传任何地方），也可以整库恢复。
-- 投递记录还支持 CSV 导出/导入（UTF-8 BOM、CRLF，以 `= + - @` 开头的单元格会加保护前缀，防止表格软件当公式执行）。
-- 数据接近 7 MiB 时扩展会拒绝继续写入并提示导出整理，而不是悄悄丢数据。
-- 导入文件分「履历文件」「投递 CSV」「完整备份」三个入口；任何校验失败都不会改动已有数据。
-
-## 7. 运行测试
+然后在 `chrome://extensions` 中点击扩展的“重新加载”，并刷新目标招聘页面。不要反复卸载；卸载会清除扩展本地数据。
 
 | 命令 | 作用 |
 | --- | --- |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Vitest 单元测试（110 个） |
-| `npm run build` | 生产构建，并校验 manifest 引用与权限 |
-| `npm run build:e2e` | 生成 `.test-dist/`（仅测试用，额外带 loopback host 权限） |
-| `npx playwright install chromium` | 首次安装或升级 Playwright 后下载匹配的测试浏览器 |
-| `npm run test:e2e` | Playwright 真实扩展端到端测试（44 个） |
-| `npm run diagnose` | 构建并提供只读兼容性诊断包，用于分析真实招聘页面（不进入 `dist/`） |
-| `npm run verify` | 以上全部按顺序执行 |
+| `npm run typecheck` | TypeScript 静态检查 |
+| `npm test` | 运行 Vitest 单元测试 |
+| `npm run build` | 生成生产扩展并校验 manifest、文件引用和权限 |
+| `npm run build:e2e` | 生成只供测试使用的 `.test-dist/` |
+| `npm run test:e2e` | 使用 Playwright Chromium 运行真实扩展端到端测试 |
+| `npm run diagnose` | 构建只读兼容性诊断工具，帮助分析新的招聘页面 |
+| `npm run verify` | 依次执行类型检查、单元测试、生产构建和端到端测试 |
 
-测试结果与性能数据见 [docs/DEMO-ACCEPTANCE.md](docs/DEMO-ACCEPTANCE.md)。
+首次运行端到端测试前需要安装匹配的 Chromium：
 
-## 8. 已知限制
-
-- 真实网站已核验 Moka、北森和飞书招聘的页面结构与实际写入，并分别建立专用适配器与本地回归。详见 [docs/SITE-COMPATIBILITY.md](docs/SITE-COMPATIBILITY.md)。
-- 只处理当前标签页的顶层文档。iframe 内的表单、Shadow DOM、虚拟滚动下拉、未专门验证的多级联动、富文本编辑器都只会被列为待处理。
-- 自定义下拉：支持有 ARIA 关系的 combobox，也支持没有任何 ARIA、点开后在自己容器里渲染选项的那种（国内 ATS 常见）。做法都是「点开 → 精确唯一匹配 → 点击 → 回读确认」，匹配不上就恢复原样并报告，不会硬填。
-- Moka、北森与飞书招聘的已验证日期选择器可自动点选；北森省市弹窗和飞书树形地区下拉可按区县到城市的安全粒度搜索并回读。飞书还支持候选城市列表与岗位选项取唯一精确交集、动态经历和自我评价展开。其它未知日历、多级联动和虚拟滚动长列表仍保持待处理。
-- 「新增经历」只点击站点适配器明确提供的按钮；通用模式不会自己去找任何「添加」按钮。
-- 身份证号、精确住址、健康状况、政治面貌、家庭联系人等字段不在履历模型里，网页上出现时一律进入待处理。出生日期虽然可以保存，但默认需要你逐项确认，不会自动填写。
-- 标记为虚构（`source.status = fictional`）的履历只能在 `127.0.0.1` / `localhost` 的演示页面上填写。
-- 端到端测试用 Playwright 的独立 Chromium 运行；**通过工具栏点击触发 activeTab 的路径没有自动化测试**，需要人工按第 3 节步骤验证。
-- 本地存储不是加密保险箱，完整备份是明文文件。
-
-## 9. 目录
-
-```text
-public/       manifest 与扩展页面（HTML/CSS）
-src/shared/   数据模型、Zod 校验、匹配、日期、URL、CSV
-src/background/  唯一持久化写入口、计划生成、运行协调
-src/content/  页面扫描、控件操作、回读校验、站点适配器
-src/ui/       弹窗与工作台
-demo/         本地演示招聘页面（含通用、Moka、北森与飞书结构；状态由页面自己的事件维护）
-fixtures/     虚构履历与投递记录样例，以及无效输入测试集
-tests/        单元测试与真实扩展端到端测试
-docs/         计划、实现状态、验收记录、站点兼容性
+```bash
+npx playwright install chromium
+npm run verify
 ```
 
-## 10. 隐私、安全与贡献
+测试范围和验收结果见 [`docs/DEMO-ACCEPTANCE.md`](docs/DEMO-ACCEPTANCE.md)。
 
-- [PRIVACY.md](PRIVACY.md)：本地数据、页面访问和浏览器权限说明。
-- [SECURITY.md](SECURITY.md)：安全边界与私密漏洞报告方式。
-- [CONTRIBUTING.md](CONTRIBUTING.md)：开发流程、测试要求和站点适配规范。
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)：社区协作行为准则。
-- [CHANGELOG.md](CHANGELOG.md)：版本变更记录。
+## 项目结构
 
-## 11. 许可与来源
+```text
+assets/branding/  品牌图标源文件
+public/           manifest、扩展页面、样式和运行时图标
+src/background/   本地持久化、填写计划、运行协调和投递记录
+src/content/      页面扫描、控件操作、回读校验和站点适配器
+src/shared/       数据模型、校验、匹配、日期、URL 和 CSV
+src/ui/           工具栏弹窗与管理工作台
+demo/             通用、Moka、北森与飞书结构的本地演示页
+fixtures/         虚构履历、投递记录样例和无效输入测试集
+tests/            单元测试与真实扩展端到端测试
+docs/             教程、实施记录、验收与站点兼容性文档
+```
 
-本项目采用 [MIT License](LICENSE)。项目从零实现，没有复制其他项目的代码。唯一的运行时依赖是 [zod](https://github.com/colinhacks/zod)（MIT），其许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，并随生产构建一起分发。
+图标的 ImageGen 原始 PNG 位于 [`assets/branding/applykit-icon-source.png`](assets/branding/applykit-icon-source.png)，Chrome 使用的 16、32、48、128 像素版本位于 [`public/icons/`](public/icons/)。
 
-Moka、北森、飞书招聘、蔚来、科大讯飞及其他文档中出现的产品和公司名称归各自权利人所有，仅用于描述兼容性测试。ApplyKit 与这些公司或产品没有隶属、授权或背书关系。
+## 参与贡献
+
+欢迎提交问题、可脱敏复现的站点兼容性报告和代码改进。请勿在 Issue、截图、HTML 或诊断材料中提交真实姓名、手机号、邮箱、证件号码或完整简历内容。
+
+开始修改前请阅读：
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)：开发流程、测试要求和适配器规范。
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)：社区协作行为准则。
+- [`CHANGELOG.md`](CHANGELOG.md)：版本变更记录。
+
+## 许可与商标
+
+本项目采用 [MIT License](LICENSE)。运行时依赖及许可见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+
+Moka、北森、飞书招聘、蔚来、科大讯飞及文档中出现的其他产品和公司名称归各自权利人所有，仅用于描述兼容性测试。ApplyKit 与这些公司或产品没有隶属、授权或背书关系。
