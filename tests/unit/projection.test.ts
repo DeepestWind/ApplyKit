@@ -178,6 +178,18 @@ describe('U05 枚举匹配只接受唯一等价选项', () => {
       descriptor('英语等级成绩', 'text'),
     )).toEqual({ ok: true, value: '500' });
   });
+
+  it('随时到岗可安全投影为北森提供的一周内', () => {
+    const result = project(
+      { section: 'preferences', field: 'availabilityText' },
+      descriptor('到岗时间', 'select', [
+        { label: '一周内', value: 'week' },
+        { label: '一个月内', value: 'month' },
+        { label: '面议', value: 'negotiable' },
+      ]),
+    );
+    expect(result).toEqual({ ok: true, value: 'week' });
+  });
 });
 
 describe('多值、布尔与长度限制', () => {

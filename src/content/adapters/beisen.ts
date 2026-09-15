@@ -159,7 +159,10 @@ export const beisenAdapter: SiteAdapter = {
     }
     return hints;
   },
-  bindField(descriptor: FieldDescriptor): FieldBinding | null {
+  bindField(descriptor: FieldDescriptor, element: Element): FieldBinding | null {
+    if (descriptor.normalizedLabel === '期望工作城市' && element.closest('.phoenix-select--multi')) {
+      return { section: 'preferences', field: 'preferredCities' };
+    }
     const binding = BINDINGS.get(descriptor.normalizedLabel);
     if (binding?.section === descriptor.section) return binding;
     if (descriptor.controlKind === 'checkbox' && /至今$/.test(descriptor.normalizedLabel)) {
@@ -190,9 +193,12 @@ export const beisenAdapter: SiteAdapter = {
     }
     return MONTH_PICKER_LABEL.test(label) ? 'beisen-phoenix-month' : null;
   },
-  areaPickerKind(element: Element): 'beisen-phoenix-area' | null {
+  areaPickerKind(element: Element): 'beisen-phoenix-area' | 'beisen-phoenix-area-multi' | null {
     if (!(element instanceof HTMLInputElement) || !element.closest('.phoenix-select')) return null;
     const label = normalizeLabel(element.closest('.form-item')?.querySelector('.form-item__text')?.textContent ?? '');
+    if (label === '期望工作城市' && element.closest('.phoenix-select--multi')) {
+      return 'beisen-phoenix-area-multi';
+    }
     return AREA_PICKER_LABEL.test(label) ? 'beisen-phoenix-area' : null;
   },
   getSelectPopup(element: Element): Element | null {

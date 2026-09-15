@@ -195,12 +195,27 @@ export function planRun(options: PlanOptions): PlanResult {
       .map((descriptor) => descriptor.recordInstanceId)
       .filter((id): id is string => Boolean(id)),
   );
+  // 真实 Phoenix 会先把结束日期框标成 disabled/readOnly，再把同记录的“至今”
+  // 复选框作为唯一可写控件。前者因此在字段匹配前就产生 source=null，不能只靠
+  // 来源字段去重；只要本轮已经计划勾选同记录的“至今”，结构上也已完整表达结束状态。
+  for (const action of actions) {
+    if (action.kind !== 'checkbox' || action.value !== true) continue;
+    const descriptor = scan.descriptors.find((item) => item.fieldId === action.fieldId);
+    if (descriptor?.recordInstanceId && /至今$/.test(descriptor.normalizedLabel)) {
+      checkedPresentRecordInstances.add(descriptor.recordInstanceId);
+    }
+  }
   const representedResults = results.filter((result) => {
-    if (!result.source || result.reasonCode !== 'REQUIRES_USER_ACTION') return true;
+    if (result.reasonCode !== 'REQUIRES_USER_ACTION') return true;
     const descriptor = scan.descriptors.find((item) => item.fieldId === result.fieldId);
     if (!descriptor || (descriptor.controlKind !== 'date-picker' && descriptor.controlKind !== 'date' && descriptor.controlKind !== 'month')) {
       return true;
     }
+    const endDateDescriptor = descriptor.datePart?.edge === 'end' || /(?:结束|截止|终止|离职)时间/.test(descriptor.normalizedLabel);
+    if (endDateDescriptor && descriptor.recordInstanceId !== null && checkedPresentRecordInstances.has(descriptor.recordInstanceId)) {
+      return false;
+    }
+    if (!result.source) return true;
     const key = `${result.source.section}::${result.source.recordId ?? ''}::${result.source.field}`;
     return !presentCheckboxSources.has(key) && !(
       result.source.field === 'endDate' &&

@@ -11,7 +11,7 @@ import { scanPage, type ScanOutput } from './scanner';
 
 // 编辑器重载扩展后，旧标签页可能仍保留上一版隔离世界标记。
 // 能力变更时提升该值，使下一次一键填写能启动新内容脚本。
-const CONTENT_VERSION = '13';
+const CONTENT_VERSION = '14';
 const MARK = '__applykitContentVersion';
 
 declare global {

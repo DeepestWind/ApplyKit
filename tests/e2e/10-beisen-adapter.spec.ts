@@ -46,6 +46,7 @@ test('北森扫描只保留真实表单，并识别稳定标签、分区和 Phoe
   expect(byLabel('现居住地')).toEqual([expect.objectContaining({ controlKind: 'combobox' })]);
   expect(byLabel('籍贯')).toEqual([expect.objectContaining({ controlKind: 'combobox' })]);
   expect(byLabel('生源地')).toEqual([expect.objectContaining({ controlKind: 'combobox' })]);
+  expect(byLabel('期望工作城市')).toEqual([expect.objectContaining({ controlKind: 'combobox' })]);
   expect(byLabel('到岗时间')).toEqual([expect.objectContaining({ controlKind: 'combobox' })]);
   expect(byLabel('毕业时间')).toEqual([expect.objectContaining({ controlKind: 'date-picker', datePrecision: 'day' })]);
   expect(byLabel('发布时间')).toEqual([expect.objectContaining({ controlKind: 'date-picker', datePrecision: 'day' })]);
@@ -77,8 +78,10 @@ test('北森适配器通过页面控件填写、增加经历并在第二轮稳�
   );
   await expect(beisenPage.locator('[name="english-level"]')).toHaveAttribute('data-selected-value', '大学英语四级');
   await expect(beisenPage.locator('[name="english-score"]')).toHaveValue('500');
-  await expect(beisenPage.locator('[name="expected-city"]')).toHaveAttribute('data-selected-value', '杭州市');
-  await expect(beisenPage.locator('[name="availability"]')).toHaveAttribute('data-selected-value', '随时到岗');
+  await expect(beisenPage.locator('[name="expected-city"]')).toHaveAttribute(
+    'data-selected-values', JSON.stringify(['杭州市', '上海市']),
+  );
+  await expect(beisenPage.locator('[name="availability"]')).toHaveAttribute('data-selected-value', '一周内');
   await expect(beisenPage.locator('[data-name="gender"] .phoenix-radio--checked')).toHaveText('男');
   await expect(beisenPage.locator('[data-name="relocation"] .phoenix-radio--checked')).toHaveText('否');
   await expect(beisenPage.locator('[name="birth-date"]')).toHaveAttribute('data-selected-value', '2002年4月15日');
@@ -119,8 +122,8 @@ test('北森适配器通过页面控件填写、增加经历并在第二轮稳�
   expect(received['student-origin']).toBe('苏州市');
   expect(received['highest-education-type']).toBe('全国普通高等院校全日制');
   expect(received['english-level']).toBe('大学英语四级');
-  expect(received['expected-city']).toBe('杭州市');
-  expect(received['availability']).toBe('随时到岗');
+  expect(received['expected-city']).toBe(JSON.stringify(['杭州市', '上海市']));
+  expect(received['availability']).toBe('一周内');
   expect(received['education-student-number-1']).toBe('202409000001');
   expect(received['education-start-1']).toBe('2024年9月');
   expect(received['gender']).toBe('男');

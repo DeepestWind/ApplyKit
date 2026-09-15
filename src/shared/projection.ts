@@ -19,6 +19,16 @@ const BOOLEAN_WORDS: Record<'true' | 'false', string[]> = {
 
 const PRESENT_WORDS = ['至今', '在职', '在读', 'present', 'now'];
 
+function availabilityRepresentations(value: string): string[] {
+  const raw = value.trim();
+  const normalized = normalizeLabel(raw).toLowerCase();
+  if (/^(?:随时|随时到岗|立即到岗|即刻到岗)$/.test(normalized)) {
+    // “立即/随时”是“一周内”的更严格承诺，北森常只提供后者。
+    return [raw, '随时', '随时到岗', '立即到岗', '一周内'];
+  }
+  return [raw];
+}
+
 /** 一个值在网页上可以接受的写法集合；集合为空表示无法表示。 */
 export function acceptableRepresentations(value: CatalogValue): string[] {
   switch (value.kind) {
@@ -186,7 +196,12 @@ export function projectValue(
     case 'select':
     case 'radio':
     case 'combobox':
-      return optionProjection(descriptor, acceptableRepresentations(value));
+      return optionProjection(
+        descriptor,
+        catalogField.field === 'availabilityText' && value.kind === 'text'
+          ? availabilityRepresentations(value.value)
+          : acceptableRepresentations(value),
+      );
     case 'checkbox': {
       if (value.kind === 'endDate') {
         return { ok: true, value: isPresent(value.value) };

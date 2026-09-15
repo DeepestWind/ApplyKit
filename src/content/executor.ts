@@ -3,7 +3,7 @@ import { normalizeLabel, valuesEqual } from '../shared/normalize';
 import type { ExecutionOutcome } from '../shared/protocol';
 import type { FillAction, ReasonCode, SectionKind } from '../shared/types';
 import { fillCombobox } from './controls/combobox';
-import { areaValuesEqual } from './controls/area-picker';
+import { areaValuesEqual, readBeisenMultiAreaValues } from './controls/area-picker';
 import { fillCheckbox, fillRadio } from './controls/choice';
 import { fillDateInput } from './controls/date';
 import { fillSelect } from './controls/select';
@@ -60,6 +60,10 @@ function actionValueStillPresent(entry: ControlEntry, action: FillAction): boole
   const current = readCurrentValue(entry).trim();
   if (action.kind === 'checkbox') return current === (action.value === true ? 'true' : 'false');
   const candidates = Array.isArray(action.value) ? action.value : [String(action.value)];
+  if (entry.areaPickerKind === 'beisen-phoenix-area-multi') {
+    const selected = readBeisenMultiAreaValues(entry.primary);
+    return candidates.every((candidate) => selected.some((value) => areaValuesEqual(value, candidate)));
+  }
   if (entry.areaPickerKind === 'beisen-phoenix-area' || entry.areaPickerKind === 'feishu-tree-area' ||
       (entry.kind === 'combobox' && /(?:城市|地点|现居|籍贯)/.test(entry.descriptor.normalizedLabel))) {
     return candidates.some((candidate) => areaValuesEqual(current, candidate));

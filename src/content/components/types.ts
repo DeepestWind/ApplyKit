@@ -9,7 +9,7 @@ export type DatePickerKind =
   | 'beisen-phoenix-day'
   | 'feishu-period-month'
   | 'feishu-year';
-export type AreaPickerKind = 'beisen-phoenix-area' | 'feishu-tree-area';
+export type AreaPickerKind = 'beisen-phoenix-area' | 'beisen-phoenix-area-multi' | 'feishu-tree-area';
 
 /** 平台可以声明已验证的组件变体；业务判断仍留在平台层。 */
 export interface ComponentHints {

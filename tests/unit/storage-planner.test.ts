@@ -323,6 +323,47 @@ describe('计划生成', () => {
     expect(plan.results.map((result) => result.fieldId)).toEqual(['project-present']);
   });
 
+  it('本轮计划勾选至今也会去掉同记录无来源的禁用结束日期提示', () => {
+    const endDate = {
+      ...descriptor({
+        fieldId: 'project-end',
+        label: '结束时间',
+        section: 'projects',
+        controlKind: 'date-picker',
+        recordInstanceId: 'project-0',
+        datePart: { edge: 'end' as const, unit: 'month' as const },
+      }),
+      disabled: true,
+    };
+    const present = descriptor({
+      fieldId: 'project-present',
+      label: '结束时间至今',
+      section: 'projects',
+      controlKind: 'checkbox',
+      recordInstanceId: 'project-0',
+    });
+    const scan = scanOf([endDate, present], {
+      adapterBindings: [
+        { fieldId: 'project-end', section: 'projects', field: 'endDate' },
+        { fieldId: 'project-present', section: 'projects', field: 'endDate' },
+      ],
+      recordInstances: [{
+        section: 'projects',
+        sectionInstanceId: 'sec-0',
+        recordInstanceId: 'project-0',
+        degreeHint: null,
+        identityHint: null,
+        order: 0,
+      }],
+      orderFallbackSections: ['projects'],
+    });
+    const plan = planRun({ scan, profile: demoProfile, rules: [] });
+    expect(plan.actions).toEqual([
+      expect.objectContaining({ fieldId: 'project-present', kind: 'checkbox', value: true }),
+    ]);
+    expect(plan.results.map((result) => result.fieldId)).not.toContain('project-end');
+  });
+
   it('计划里不含任何模型调用或可执行片段', () => {
     const descriptors = [descriptor({ fieldId: 'f1', label: '姓名', section: 'personal' })];
     const plan = planRun({ scan: scanOf(descriptors), profile: demoProfile, rules: [] });

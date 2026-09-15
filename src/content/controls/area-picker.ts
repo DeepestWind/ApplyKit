@@ -81,6 +81,74 @@ function matchingAreaItems(picker: HTMLElement, acceptable: string[]): HTMLEleme
     });
 }
 
+function uniqueAreaValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const normalized = normalizeLabel(value);
+    const key = normalized.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** 北森多选 Phoenix 控件会把每个城市渲染成独立 tag；输入框本身始终为空。 */
+export function readBeisenMultiAreaValues(element: Element): string[] {
+  const input = element instanceof HTMLInputElement ? element : element.querySelector<HTMLInputElement>('input');
+  const serialized = input?.dataset['selectedValues'];
+  if (serialized) {
+    try {
+      const parsed: unknown = JSON.parse(serialized);
+      if (Array.isArray(parsed)) {
+        return uniqueAreaValues(parsed.filter((item): item is string => typeof item === 'string'));
+      }
+    } catch {
+      // 真实页面没有该测试辅助属性，继续读取可见 tag。
+    }
+  }
+
+  const root = element.closest('.phoenix-select') ?? element;
+  const explicit = [...root.querySelectorAll<HTMLElement>(
+    '.phoenix-select__tipEle, [data-select-display], [class*="multiple"][class*="label"], '
+      + '[class*="multi"][class*="label"], [class*="tag"][class*="label"]',
+  )]
+    .filter(isVisible)
+    .map((node) => normalizeLabel(node.textContent ?? ''))
+    .filter(Boolean);
+  if (explicit.length > 0) return uniqueAreaValues(explicit);
+
+  // Phoenix 版本间 tag 类名会变化。最后只读取控件内可见的叶子文本，排除占位
+  // 与清除按钮，仍不跨到页面上的其他城市文字。
+  return uniqueAreaValues(
+    [...root.querySelectorAll<HTMLElement>('*')]
+      .filter((node) => node.children.length === 0 && isVisible(node))
+      .map((node) => normalizeLabel(node.textContent ?? ''))
+      .filter((value) => value !== '' && value !== '请选择' && value !== '清除' && value !== '×'),
+  );
+}
+
+export function readBeisenMultiAreaValue(element: Element): string {
+  return readBeisenMultiAreaValues(element).join('、');
+}
+
+function clickAreaIcon(item: HTMLElement, multi: boolean): void {
+  const icon = [...item.querySelectorAll<HTMLElement>('.icon-container')].find(isVisible);
+  if (!icon) throw new Error('missing-area-icon');
+  const selector = multi
+    ? '.area-icon-CheckboxUnchecked, .area-icon-CheckboxChecked, [class*="CheckboxUnchecked"], [class*="CheckboxChecked"]'
+    : '.area-icon-RadioUnchecked, .area-icon-RadioChecked, [class*="RadioUnchecked"], [class*="RadioChecked"]';
+  const target = icon.querySelector<Element>(selector) ?? icon;
+  if (target instanceof HTMLElement) target.click();
+  else target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+}
+
+function selectedAreaLabels(picker: HTMLElement): string[] {
+  return [...picker.querySelectorAll<HTMLElement>('.select-area-text-label')]
+    .filter(isVisible)
+    .map((node) => normalizeLabel(node.textContent ?? ''))
+    .filter(Boolean);
+}
+
 export async function fillAreaPicker(
   entry: ControlEntry,
   acceptable: string[],
@@ -144,13 +212,9 @@ export async function fillAreaPicker(
   // 真实 Phoenix 把 onClick 绑在图标子节点；对外层 icon-container 调用
   // HTMLElement.click() 不会把事件向子节点传递。浏览器人工点击外壳时实际
   // 命中的也是这个内层图标。
-  const clickTarget = icons[0]!.querySelector<Element>(
-    '.area-icon-RadioUnchecked, .area-icon-RadioChecked, [class*="RadioUnchecked"], [class*="RadioChecked"]',
-  ) ?? icons[0]!;
-  // 真实页面的内层图标是 SVGElement，没有 HTMLElement.click()。直接调用会抛错，
-  // 让整轮停在当前进度；SVG 用冒泡 MouseEvent 触发同一条 React 点击链路。
-  if (clickTarget instanceof HTMLElement) clickTarget.click();
-  else clickTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  // 真实页面的内层图标是 SVGElement，没有 HTMLElement.click()。通过统一入口给
+  // SVG 派发冒泡 MouseEvent，触发与人工点击相同的 React 链路。
+  clickAreaIcon(matches[0]!, false);
   // 真实 Phoenix 在选中地区后会替换整个 picker 子树。每次等待都从
   // document 重新取当前弹层，不在已断开的旧节点上误判失败。
   const selected = await waitFor(() => {
@@ -184,6 +248,124 @@ export async function fillAreaPicker(
   if (!input.isConnected) return failResult('STALE_PAGE', '选择地区后网页替换了节点');
   if (!areaValuesEqual(readCurrentValue(entry), optionLabel)) {
     return failResult('VALIDATION_FAILED', '确认地区后网页没有回显目标值');
+  }
+  return okResult('FILLED_VERIFIED', '');
+}
+
+/** 北森期望城市使用同一个地区弹窗，但通过复选框一次提交多个城市。 */
+export async function fillBeisenMultiAreaPicker(
+  entry: ControlEntry,
+  acceptable: string[],
+  overwrite: boolean,
+): Promise<ControlResult> {
+  const input = entry.primary as HTMLInputElement;
+  const desired = uniqueAreaValues(acceptable.map((value) => normalizeLabel(value)).filter(Boolean));
+  if (desired.length === 0) return failResult('AMBIGUOUS_OPTION', '履历中的意向城市列表为空');
+
+  const current = readBeisenMultiAreaValues(input);
+  const contains = (values: string[], target: string) => values.some((value) => areaValuesEqual(value, target));
+  if (desired.every((target) => contains(current, target))) {
+    return okResult('VALUE_ALREADY_EQUAL', '网页上已经包含全部意向城市');
+  }
+  const unrelated = current.filter((value) => !desired.some((target) => areaValuesEqual(value, target)));
+  if (unrelated.length > 0 && !overwrite) {
+    return failResult('EXISTING_VALUE', '网页已有履历以外的意向城市，已保留原值');
+  }
+
+  input.focus({ preventScroll: true });
+  input.click();
+  const opened = await waitFor(() => visibleAreaPicker(input.ownerDocument) !== null, OPEN_TIMEOUT_MS);
+  let picker = visibleAreaPicker(input.ownerDocument);
+  if (!opened || !picker) return failResult('TIMEOUT', '多选地区选择器没有在 2 秒内打开');
+
+  const capacityMatch = /(\d+)\s*\/\s*(\d+)/.exec(normalizeLabel(picker.textContent ?? ''));
+  const capacity = capacityMatch ? Number(capacityMatch[2]) : Number.POSITIVE_INFINITY;
+  if (Number.isFinite(capacity) && desired.length > capacity) {
+    await cancel(picker);
+    return failResult('AMBIGUOUS_OPTION', `网页最多允许选择 ${capacity} 个城市，履历中有 ${desired.length} 个`);
+  }
+
+  for (const target of desired) {
+    picker = visibleAreaPicker(input.ownerDocument);
+    if (!picker) return failResult('STALE_PAGE', '选择意向城市时弹层结构已变化');
+    if (selectedAreaLabels(picker).some((value) => areaValuesEqual(value, target))) continue;
+
+    let selectedTarget: string | null = null;
+    let matches: HTMLElement[] = [];
+    for (const searchChoice of areaSearchChoices(target)) {
+      picker = visibleAreaPicker(input.ownerDocument);
+      if (!picker) return failResult('STALE_PAGE', '搜索意向城市时弹层结构已变化');
+      const searchInputs = [...picker.querySelectorAll<HTMLInputElement>('input[placeholder="搜索"]')]
+        .filter(isVisible)
+        .filter((candidate) => !candidate.disabled && !candidate.readOnly);
+      if (searchInputs.length !== 1) {
+        await cancel(picker);
+        return failResult('AMBIGUOUS_OPTION', '无法唯一定位多选地区搜索框');
+      }
+      setNativeValue(searchInputs[0]!, areaKey(searchChoice));
+      dispatchInputEvents(searchInputs[0]!);
+      const found = await waitFor(() => {
+        const currentPicker = visibleAreaPicker(input.ownerDocument);
+        return currentPicker !== null && matchingAreaItems(currentPicker, [searchChoice]).length > 0;
+      }, SEARCH_TIMEOUT_MS);
+      picker = visibleAreaPicker(input.ownerDocument);
+      matches = picker ? matchingAreaItems(picker, [searchChoice]) : [];
+      if (found && matches.length > 0) {
+        selectedTarget = searchChoice;
+        break;
+      }
+    }
+    if (!picker || !selectedTarget || matches.length === 0) {
+      if (picker) await cancel(picker);
+      return failResult('AMBIGUOUS_OPTION', `地区搜索中没有“${target}”对应的城市选项，需要手动选择`);
+    }
+    if (matches.length !== 1) {
+      await cancel(picker);
+      return failResult('AMBIGUOUS_OPTION', `“${target}”搜索到 ${matches.length} 个对应项，需要手动选择`);
+    }
+
+    const optionLabel = normalizeLabel(matches[0]!.querySelector('.area-text-label')?.textContent ?? '');
+    const icons = [...matches[0]!.querySelectorAll<HTMLElement>('.icon-container')].filter(isVisible);
+    if (icons.length !== 1) {
+      await cancel(picker);
+      return failResult('UNSUPPORTED_WIDGET', '多选地区选项缺少唯一的复选按钮');
+    }
+    try {
+      clickAreaIcon(matches[0]!, true);
+    } catch {
+      await cancel(picker);
+      return failResult('UNSUPPORTED_WIDGET', '多选地区选项缺少可操作的复选按钮');
+    }
+    const selected = await waitFor(() => {
+      const currentPicker = visibleAreaPicker(input.ownerDocument);
+      return currentPicker !== null && selectedAreaLabels(currentPicker).some((value) => areaValuesEqual(value, optionLabel));
+    }, COMMIT_TIMEOUT_MS);
+    if (!selected) {
+      const currentPicker = visibleAreaPicker(input.ownerDocument);
+      if (currentPicker) await cancel(currentPicker);
+      return failResult('VALIDATION_FAILED', `“${optionLabel}”没有进入已选城市列表`);
+    }
+  }
+
+  picker = visibleAreaPicker(input.ownerDocument);
+  if (!picker) return failResult('STALE_PAGE', '确认意向城市前弹层结构已变化');
+  const confirmButtons = exactLeaf(picker, '.phoenix-button__content', '确定');
+  if (confirmButtons.length !== 1) {
+    await cancel(picker);
+    return failResult('AMBIGUOUS_OPTION', '无法唯一定位多选地区确认按钮');
+  }
+  confirmButtons[0]!.click();
+  const closed = await waitFor(() => visibleAreaPicker(input.ownerDocument) === null, COMMIT_TIMEOUT_MS);
+  await nextFrames(2);
+  await delay(60);
+  if (!closed) {
+    await cancel(picker);
+    return failResult('TIMEOUT', '确认意向城市后弹窗没有关闭');
+  }
+  if (!input.isConnected) return failResult('STALE_PAGE', '选择意向城市后网页替换了节点');
+  const after = readBeisenMultiAreaValues(input);
+  if (!desired.every((target) => contains(after, target))) {
+    return failResult('VALIDATION_FAILED', '确认意向城市后网页没有回显全部目标城市');
   }
   return okResult('FILLED_VERIFIED', '');
 }

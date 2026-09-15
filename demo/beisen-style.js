@@ -5,7 +5,7 @@ function record(element) {
   if (!name) return;
   const value = element.type === 'checkbox'
     ? String(element.checked)
-    : (element.dataset.selectedValue || element.value || '');
+    : (element.dataset.selectedValues || element.dataset.selectedValue || element.value || '');
   received.set(name, value);
 }
 
@@ -41,6 +41,24 @@ function setSelectValue(box, input, value) {
     decoy.innerHTML = '<div class="form-item__title"><label class="form-item__text">回归占位字段</label></div><div class="form-item__control"><input name="shift-decoy"></div>';
     document.querySelector('#beisen-form')?.prepend(decoy);
   }
+  closeLayers();
+}
+
+function setMultiSelectValue(box, input, values) {
+  input.value = '';
+  delete input.dataset.selectedValue;
+  input.dataset.selectedValues = JSON.stringify(values);
+  box.querySelector('.phoenix-select__placeHolder')?.remove();
+  box.querySelectorAll('.phoenix-select__tipEle').forEach((display) => display.remove());
+  for (const value of values) {
+    const display = document.createElement('span');
+    display.className = 'phoenix-select__tipEle';
+    display.textContent = value;
+    box.prepend(display);
+  }
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  record(input);
   closeLayers();
 }
 
@@ -85,7 +103,9 @@ function openAreaPicker(box) {
   closeLayers();
   const input = box.querySelector('input');
   const options = JSON.parse(box.dataset.options || '[]');
+  const multi = box.hasAttribute('data-area-multi');
   let selectedValue = null;
+  let selectedValues = new Set();
   const layer = document.createElement('div');
   layer.className = 'common-unmodeled-layer common-unmodeled-layer-placement-bottomLeft';
   const picker = document.createElement('div');
@@ -105,7 +125,7 @@ function openAreaPicker(box) {
   const right = document.createElement('div');
   right.className = 'right-container';
   const header = document.createElement('div');
-  header.innerHTML = '<span>已选地区</span><span class="select-data-num-text">0</span><span>/1</span>';
+  header.innerHTML = `<span>已选地区</span><span class="select-data-num-text">0</span><span>/${multi ? 99 : 1}</span>`;
   const selected = document.createElement('div');
   selected.className = 'select-data-container';
   right.append(header, selected);
@@ -120,7 +140,8 @@ function openAreaPicker(box) {
   confirm.className = 'phoenix-button__content';
   confirm.textContent = '确定';
   confirm.addEventListener('click', () => {
-    if (selectedValue) setSelectValue(box, input, selectedValue);
+    if (multi && selectedValues.size > 0) setMultiSelectValue(box, input, [...selectedValues]);
+    else if (selectedValue) setSelectValue(box, input, selectedValue);
   });
   footer.append(cancel, confirm);
 
@@ -136,7 +157,10 @@ function openAreaPicker(box) {
       icon.className = 'icon-container visible';
       // 真实 Phoenix 的单选图标是 SVGElement，不提供 HTMLElement.click()。
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('class', value === selectedValue ? 'area-icon-RadioChecked' : 'area-icon-RadioUnchecked');
+      const checked = multi ? selectedValues.has(value) : value === selectedValue;
+      svg.setAttribute('class', multi
+        ? checked ? 'area-icon-CheckboxChecked' : 'area-icon-CheckboxUnchecked'
+        : checked ? 'area-icon-RadioChecked' : 'area-icon-RadioUnchecked');
       svg.setAttribute('width', '12');
       svg.setAttribute('height', '12');
       const label = document.createElement('span');
@@ -144,9 +168,17 @@ function openAreaPicker(box) {
       label.textContent = value;
       icon.append(svg);
       icon.addEventListener('click', () => {
-        selectedValue = value;
-        header.querySelector('.select-data-num-text').textContent = '1';
-        selected.innerHTML = `<div class="select-item-container"><span class="select-area-text-label">${value}</span></div>`;
+        if (multi) {
+          if (selectedValues.has(value)) selectedValues.delete(value);
+          else selectedValues.add(value);
+        } else {
+          selectedValue = value;
+        }
+        const values = multi ? [...selectedValues] : selectedValue ? [selectedValue] : [];
+        header.querySelector('.select-data-num-text').textContent = String(values.length);
+        selected.innerHTML = values
+          .map((selectedArea) => `<div class="select-item-container"><span class="select-area-text-label">${selectedArea}</span></div>`)
+          .join('');
         render();
       });
       name.append(icon, label);

@@ -1,4 +1,4 @@
-import { fillAreaPicker, fillFeishuAreaPicker } from '../controls/area-picker';
+import { fillAreaPicker, fillBeisenMultiAreaPicker, fillFeishuAreaPicker, readBeisenMultiAreaValue } from '../controls/area-picker';
 import { fillDatePicker } from '../controls/date-picker';
 import { isOwnElement, isVisible } from '../dom-utils';
 import { antMobileDriver } from './ant-mobile';
@@ -27,10 +27,16 @@ export function resolveComponent(
     };
   }
   if (hints.areaPickerKind) {
+    const multi = hints.areaPickerKind === 'beisen-phoenix-area-multi';
     return {
       id: hints.areaPickerKind,
       kind: 'combobox',
-      fill: hints.areaPickerKind === 'beisen-phoenix-area' ? fillAreaPicker : fillFeishuAreaPicker,
+      ...(multi ? { readValue: readBeisenMultiAreaValue } : {}),
+      fill: hints.areaPickerKind === 'beisen-phoenix-area'
+        ? fillAreaPicker
+        : multi
+          ? fillBeisenMultiAreaPicker
+          : fillFeishuAreaPicker,
     };
   }
   const matches = DRIVERS.flatMap((driver) => {
