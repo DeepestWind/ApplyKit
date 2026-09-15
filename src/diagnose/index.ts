@@ -18,6 +18,7 @@ interface DiagnoseField {
   section: string;
   recordInstanceId: string | null;
   controlKind: string;
+  componentId: string | null;
   required: boolean;
   /** 页面上这个字段当前是否为空（只报布尔，不报内容）。 */
   empty: boolean;
@@ -36,6 +37,7 @@ export interface DiagnoseReport {
   adapterId: string | null;
   truncated: boolean;
   truncationReason: string | null;
+  diagnostics: string[];
   formFingerprint: string;
   jobCandidate: { company: string | null; role: string | null; externalJobId: string | null } | null;
   sections: Array<{ section: string; sectionInstanceId: string }>;
@@ -81,6 +83,7 @@ export function diagnose(profileInput?: unknown): DiagnoseReport {
       section: descriptor.section,
       recordInstanceId: descriptor.recordInstanceId,
       controlKind: descriptor.controlKind,
+      componentId: output.entries.get(descriptor.fieldId)?.component?.id ?? null,
       required: descriptor.required,
       empty: descriptor.empty,
       datePart: descriptor.datePart ? `${descriptor.datePart.edge}/${descriptor.datePart.unit}` : null,
@@ -105,6 +108,7 @@ export function diagnose(profileInput?: unknown): DiagnoseReport {
     adapterId: scan.adapterId,
     truncated: scan.truncated,
     truncationReason: scan.truncationReason,
+    diagnostics: scan.diagnostics ?? [],
     formFingerprint: scan.formFingerprint,
     jobCandidate: scan.jobCandidate
       ? {

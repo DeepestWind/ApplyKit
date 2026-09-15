@@ -154,6 +154,30 @@ describe('U05 枚举匹配只接受唯一等价选项', () => {
     ]));
     expect(result.ok).toBe(false);
   });
+
+  it('个人信息区可以读取最高学历学习形式与英语等级投影', () => {
+    const educationType = project(
+      { section: 'personal', field: 'highestEducationType' },
+      descriptor('学习形式', 'combobox'),
+    );
+    expect(educationType).toEqual({
+      ok: true,
+      value: expect.arrayContaining(['全国普通高等院校全日制', '全日制统招']),
+    });
+
+    const englishLevel = project(
+      { section: 'personal', field: 'englishLevel' },
+      descriptor('英语等级', 'combobox'),
+    );
+    expect(englishLevel).toEqual({
+      ok: true,
+      value: expect.arrayContaining(['CET-4', '大学英语四级', '四级']),
+    });
+    expect(project(
+      { section: 'personal', field: 'englishScore' },
+      descriptor('英语等级成绩', 'text'),
+    )).toEqual({ ok: true, value: '500' });
+  });
 });
 
 describe('多值、布尔与长度限制', () => {

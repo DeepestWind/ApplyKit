@@ -28,6 +28,8 @@ export interface PlanResult {
   results: FieldResult[];
   addRequests: Array<{ section: SectionKind; sectionInstanceId: string; count: number }>;
   recordBindingNotes: string[];
+  /** 网页记录数超过履历且整条记录仍为空；详情页会按记录折叠展示。 */
+  excessEmptyRecordInstanceIds: string[];
 }
 
 const REPEATED_SECTIONS: KnownSection[] = [
@@ -73,7 +75,9 @@ export function planRun(options: PlanOptions): PlanResult {
 
   // 1) 重复经历绑定。
   const recordBindings = new Map<string, ReturnType<typeof bindRecords> extends Map<string, infer V> ? V : never>();
-  const recordBindingNotes: string[] = [];
+  const recordBindingNotes: string[] = [...(scan.diagnostics ?? [])];
+  const excessEmptyRecordInstanceIds = new Set<string>();
+  const excessCounts = new Map<KnownSection, number>();
   for (const section of REPEATED_SECTIONS) {
     const instances: RecordInstance[] = scan.recordInstances
       .filter((instance) => instance.section === section)
@@ -93,8 +97,22 @@ export function planRun(options: PlanOptions): PlanResult {
     });
     for (const [key, value] of bound) {
       recordBindings.set(key, value);
-      if (!value.ok) recordBindingNotes.push(`${section}: ${value.message}`);
+      if (!value.ok) {
+        const fields = scan.descriptors.filter((descriptor) => descriptor.recordInstanceId === key);
+        const excessEmpty = value.reasonCode === 'SOURCE_MISSING' && fields.length > 0 && fields.every((field) => field.empty);
+        if (excessEmpty) {
+          excessEmptyRecordInstanceIds.add(key);
+          excessCounts.set(section, (excessCounts.get(section) ?? 0) + 1);
+        } else {
+          recordBindingNotes.push(`${getSection(section)?.label ?? section}：${value.message}`);
+        }
+      }
     }
+  }
+  for (const [section, count] of excessCounts) {
+    recordBindingNotes.push(
+      `${getSection(section)?.label ?? section}：网页多出 ${count} 条完全空白的记录，履历中没有对应经历；详情已按记录折叠，请在网页删除空记录或手动补充。`,
+    );
   }
 
   // 2) 适配器绑定（仍需通过白名单校验）。
@@ -171,6 +189,12 @@ export function planRun(options: PlanOptions): PlanResult {
       .filter((action) => action.kind === 'checkbox' && action.value === true)
       .map((action) => `${action.source.section}::${action.source.recordId ?? ''}::${action.source.field}`),
   );
+  const checkedPresentRecordInstances = new Set(
+    scan.descriptors
+      .filter((descriptor) => descriptor.controlKind === 'checkbox' && !descriptor.empty && /至今$/.test(descriptor.normalizedLabel))
+      .map((descriptor) => descriptor.recordInstanceId)
+      .filter((id): id is string => Boolean(id)),
+  );
   const representedResults = results.filter((result) => {
     if (!result.source || result.reasonCode !== 'REQUIRES_USER_ACTION') return true;
     const descriptor = scan.descriptors.find((item) => item.fieldId === result.fieldId);
@@ -178,7 +202,11 @@ export function planRun(options: PlanOptions): PlanResult {
       return true;
     }
     const key = `${result.source.section}::${result.source.recordId ?? ''}::${result.source.field}`;
-    return !presentCheckboxSources.has(key);
+    return !presentCheckboxSources.has(key) && !(
+      result.source.field === 'endDate' &&
+      descriptor.recordInstanceId !== null &&
+      checkedPresentRecordInstances.has(descriptor.recordInstanceId)
+    );
   });
 
   // 3) 新增经历：只有适配器提供按钮的分区才请求，且不超过履历实际条数。
@@ -201,5 +229,11 @@ export function planRun(options: PlanOptions): PlanResult {
     }
   }
 
-  return { actions, results: representedResults, addRequests, recordBindingNotes };
+  return {
+    actions,
+    results: representedResults,
+    addRequests,
+    recordBindingNotes,
+    excessEmptyRecordInstanceIds: [...excessEmptyRecordInstanceIds],
+  };
 }

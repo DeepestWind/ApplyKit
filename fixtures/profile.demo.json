@@ -65,6 +65,7 @@
         },
         "gpa": "3.60",
         "gpaScale": "4.00",
+        "educationType": "fullTimeUnified",
         "lab": "示例网络空间安全实验室",
         "researchDirection": "智能体系统与软件安全",
         "advisor": "示例导师",
@@ -88,6 +89,7 @@
         },
         "gpa": "3.80",
         "gpaScale": "4.00",
+        "educationType": "fullTimeUnified",
         "description": "虚构本科教育经历，不能与硕士经历的学校、专业或日期混填。",
         "studentNumber": null
       }

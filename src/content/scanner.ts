@@ -9,8 +9,10 @@ import {
   choiceOptionValue, classifySelectLikeInput, displayedSelectValue, groupLabelFor, isChoiceChecked,
   isOwnElement, isVisible, resolveLabel,
 } from './dom-utils';
-import { analyzeStructure, type RecordContainer } from './sections';
-import type { AreaPickerKind, DatePickerKind, SiteAdapter } from './adapters/types';
+import { analyzeStructure, sectionContains, type RecordContainer } from './sections';
+import type { SiteAdapter } from './adapters/types';
+import type { AreaPickerKind, ComponentBinding, DatePickerKind } from './components/types';
+import { discoverComponentControls, resolveComponent } from './components/registry';
 
 /** DOM 到 FieldDescriptor。元素本身只保存在内容脚本私有 Map 中，不发给后台。 */
 
@@ -29,6 +31,7 @@ export interface ControlEntry {
   datePickerKind: DatePickerKind | null;
   areaPickerKind: AreaPickerKind | null;
   getSelectPopup: (() => Element | null) | null;
+  component?: ComponentBinding | null;
 }
 
 export interface ScanOutput {
@@ -189,6 +192,7 @@ interface RawControl {
   /** 一个视觉年月区间只有一个隐藏 input，适配器把它拆成两个逻辑端点。 */
   forcedDatePart?: DatePart;
   forcedLabel?: string;
+  component?: ComponentBinding;
 }
 
 /** 收集候选控件；密码、隐藏字段既不读取也不计入字段数量。 */
@@ -300,6 +304,13 @@ function collectControls(root: ParentNode, adapter: SiteAdapter): RawControl[] {
     }
   }
 
+  for (const element of discoverComponentControls(root)) {
+    // 组件必须明确认领结构；List.Item 也可能只是导航，不能无条件当成字段。
+    const component = resolveComponent(element, resolveLabel(element).raw);
+    if (!component || controls.some((control) => element.contains(control.primary) || control.primary.contains(element))) continue;
+    controls.push({ kind: component.kind, elements: [element], primary: element, component });
+  }
+
   // 页面上既有真实控件又有视觉壳时，只保留一个逻辑控件。
   return controls.filter((control) => {
     if (control.kind !== 'combobox') return true;
@@ -316,8 +327,18 @@ function collectControls(root: ParentNode, adapter: SiteAdapter): RawControl[] {
 /** 有标签但没有可识别控件的行：报告为待处理，不猜测其结构。 */
 function collectOrphanLabels(root: ParentNode, controls: RawControl[]): RawControl[] {
   const orphans: RawControl[] = [];
-  for (const label of root.querySelectorAll<HTMLElement>('label')) {
+  const candidates = root.querySelectorAll<HTMLElement>('label, [class*="label"], [class*="Label"], .am-list-content');
+  for (const label of candidates) {
     if (isOwnElement(label) || !isVisible(label)) continue;
+    if (label.closest('nav, a[href], [role="dialog"], [role="listbox"], .am-picker-popup, .am-modal')) continue;
+    const nativeLabel = label.tagName.toLowerCase() === 'label';
+    const text = collapseWhitespace(label.textContent ?? '');
+    if (!nativeLabel) {
+      // 只报告“短标签 + 同行控件分支”的结构，忽略选项文案、说明文字、空展示值。
+      if (!text || text.length > 60 || !label.nextElementSibling ||
+          (label.parentElement?.children.length ?? 0) > 4 ||
+          ![...label.classList].some((name) => /(?:^label(?:[-_]|$)|Label(?:___|$)|[-_]label(?:[-_]|$)|^am-list-content$)/.test(name))) continue;
+    }
     const forId = label.getAttribute('for');
     if (forId && label.ownerDocument.getElementById(forId)) continue;
     if (label.querySelector('input, select, textarea, [role="combobox"]')) continue;
@@ -325,13 +346,15 @@ function collectOrphanLabels(root: ParentNode, controls: RawControl[]): RawContr
     if (!row) continue;
     // Phoenix 标题和控件位于同一个 form-item 的两个分支；普通页面仍只检查标签直属行，
     // 避免向上走到整个 form 后把真正的孤儿控件吞掉。
-    const fieldScope = label.closest('.form-item, .atsx-form-item') ?? row;
+    const fieldScope = label.closest('.form-item, .atsx-form-item, .am-list-item') ?? row;
     if (controls.some((control) => fieldScope.contains(control.primary))) continue;
+    if (orphans.some((orphan) => fieldScope.contains(orphan.primary))) continue;
     orphans.push({
       kind: 'unsupported',
       elements: [label],
       primary: label,
       unsupportedReason: '这是页面自定义的控件，扩展无法安全操作',
+      forcedLabel: text,
     });
   }
   return orphans;
@@ -424,7 +447,7 @@ export function scanPage(options: ScanOptions): ScanOutput {
     const dateDetection = detectDatePart(element, labelInfo.normalized, groupLabel);
     const datePart = control.forcedDatePart ?? dateDetection?.part ?? null;
     // radio 组的含义来自组标签，不是某个选项自己的文字。
-    const label = control.forcedLabel ?? dateDetection?.label ??
+    const label = control.forcedLabel ?? control.component?.label ?? dateDetection?.label ??
       (control.kind === 'radio' && groupLabel ? groupLabel : labelInfo.raw);
     const normalized = normalizeLabel(label);
 
@@ -439,13 +462,12 @@ export function scanPage(options: ScanOptions): ScanOutput {
     const locked = (element as HTMLInputElement).disabled === true || (element as HTMLInputElement).readOnly === true;
 
     const datePickerKind = selectLike === 'date-picker' ? (adapter.datePickerKind?.(element) ?? null) : null;
-    const datePrecision = datePickerKind === 'beisen-phoenix-day' ? 'day'
-      : datePickerKind === 'feishu-year' ? 'year'
-        : datePickerKind ? 'month' : null;
     const areaPickerKind = (control.kind === 'combobox' || selectLike === 'custom-select')
       ? (adapter.areaPickerKind?.(element) ?? null)
       : null;
-    const supportedDatePicker = datePickerKind !== null;
+    const component = control.component ?? resolveComponent(element, label, { datePickerKind, areaPickerKind });
+    const datePrecision = component?.datePrecision ?? null;
+    const supportedDatePicker = component?.kind === 'date-picker';
     const kind: ControlKind = isDeclaration || (selectLike === 'date-picker' && !supportedDatePicker)
       ? 'unsupported'
       : supportedDatePicker
@@ -488,14 +510,15 @@ export function scanPage(options: ScanOptions): ScanOutput {
       required: element.hasAttribute('required') || element.getAttribute('aria-required') === 'true' ||
         Boolean(element.closest('.form-item')?.querySelector('.form-item__required')) ||
         Boolean(element.closest('.atsx-form-item')?.querySelector('.atsx-form-item-required')),
-      disabled: (element as HTMLInputElement).disabled === true,
+      disabled: (element as HTMLInputElement).disabled === true || element.getAttribute('aria-disabled') === 'true' ||
+        (component?.isDisabled?.(element) ?? false),
       readOnly: supportedDatePicker ? false : (element as HTMLInputElement).readOnly === true,
       visible: isVisible(element) || (supportedDatePicker && Boolean(
         element.closest('.atsx-date-picker') && isVisible(element.closest('.atsx-date-picker')!),
       )) || ((kind === 'checkbox' || kind === 'radio') && Boolean(
         element.closest('label, .phoenix-checkbox') && isVisible(element.closest('label, .phoenix-checkbox')!),
       )),
-      empty: isEmptyValue(kind, control.elements),
+      empty: component?.readValue ? component.readValue(element).trim() === '' : isEmptyValue(kind, control.elements),
       maxLength: maxLengthOf(element),
       options,
       semanticFingerprint: fieldFingerprint({ section, label: normalized, controlKind: kind, options, nameHint }),
@@ -527,6 +550,7 @@ export function scanPage(options: ScanOptions): ScanOutput {
       datePickerKind,
       areaPickerKind,
       getSelectPopup: adapter.getSelectPopup ? () => adapter.getSelectPopup!(element) : null,
+      component,
     });
 
     if (recordInstanceId && !recordInstances.has(recordInstanceId)) {
@@ -549,7 +573,7 @@ export function scanPage(options: ScanOptions): ScanOutput {
   for (const entry of entries.values()) {
     if (!entry.descriptor.recordInstanceId) continue;
     if (!IDENTITY_LABELS.test(entry.descriptor.normalizedLabel)) continue;
-    const value = entry.primary instanceof HTMLInputElement
+    const value = entry.component?.readValue ? entry.component.readValue(entry.primary) : entry.primary instanceof HTMLInputElement
       ? (entry.primary.value || displayedSelectValue(entry.primary))
       : (entry.primary.textContent ?? '');
     const text = normalizeText(value);
@@ -564,6 +588,8 @@ export function scanPage(options: ScanOptions): ScanOutput {
   const addActionElements = new Map<string, { button: HTMLElement; root: Element }>();
   const sectionRoots = new Map<string, { section: SectionKind; sectionInstanceId: string; root: Element }>();
   for (const sectionBinding of structure.sections) {
+    // 虚拟的相邻分区不能把整个父容器交给平台寻找“添加”按钮。
+    if (sectionBinding.contentRoots.length !== 1 || sectionBinding.contentRoots[0] !== sectionBinding.root) continue;
     sectionRoots.set(sectionBinding.sectionInstanceId, sectionBinding);
   }
   for (const [root, hint] of hintedSections) {
@@ -583,6 +609,15 @@ export function scanPage(options: ScanOptions): ScanOutput {
   }
 
   const jobCandidate = adapter.getJobCandidate?.(document) ?? null;
+
+  const diagnostics = [...new Set(structure.sections.flatMap((section) => {
+    if (section.section === 'unknown' || descriptors.some((field) => field.section === section.section) ||
+        controlElements.some((element) => sectionContains(section, element)) ||
+        addActions.some((action) => action.section === section.section)) return [];
+    const buttons = section.contentRoots.flatMap((root) => [root, ...root.querySelectorAll('button, a, [role="button"]')]);
+    if (!buttons.some((button) => isVisible(button) && /^\+?\s*(?:添加|新增)$/.test(normalizeText(button.textContent ?? '')))) return [];
+    return [`${section.headingText}尚未展开字段，请先在网页添加经历，再重新扫描；本轮未自动点击添加。`];
+  }))].slice(0, 30);
 
   const result: ScanResult = {
     routeKey: buildRouteKey(document.location.href),
@@ -605,6 +640,7 @@ export function scanPage(options: ScanOptions): ScanOutput {
     truncated,
     truncationReason,
     formFingerprint: formFingerprint(descriptors),
+    diagnostics,
   };
 
   return { result, entries, addActionElements };

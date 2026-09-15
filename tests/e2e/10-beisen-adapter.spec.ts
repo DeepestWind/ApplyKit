@@ -33,7 +33,7 @@ test('北森扫描只保留真实表单，并识别稳定标签、分区和 Phoe
   const { run, snapshot } = await runFill(appPage, tab.tabId, profileVersionId, 'scan');
 
   expect(run.scan.adapterId).toBe('beisen-zhiye-phoenix');
-  expect(run.scan.fieldCount).toBe(37);
+  expect(run.scan.fieldCount).toBe(47);
   expect(snapshot.report.fields.some((field) => field.label === '请选择')).toBe(false);
   expect(snapshot.report.fields.some((field) => field.label === '房间')).toBe(false);
   expect(snapshot.report.fields.some((field) => field.label === '密码')).toBe(false);
@@ -45,6 +45,9 @@ test('北森扫描只保留真实表单，并识别稳定标签、分区和 Phoe
   expect(byLabel('出生日期')).toEqual([expect.objectContaining({ controlKind: 'date-picker' })]);
   expect(byLabel('现居住地')).toEqual([expect.objectContaining({ controlKind: 'combobox' })]);
   expect(byLabel('籍贯')).toEqual([expect.objectContaining({ controlKind: 'combobox' })]);
+  expect(byLabel('生源地')).toEqual([expect.objectContaining({ controlKind: 'combobox' })]);
+  expect(byLabel('到岗时间')).toEqual([expect.objectContaining({ controlKind: 'combobox' })]);
+  expect(byLabel('毕业时间')).toEqual([expect.objectContaining({ controlKind: 'date-picker', datePrecision: 'day' })]);
   expect(byLabel('发布时间')).toEqual([expect.objectContaining({ controlKind: 'date-picker', datePrecision: 'day' })]);
 });
 
@@ -66,6 +69,16 @@ test('北森适配器通过页面控件填写、增加经历并在第二轮稳�
   await expect(beisenPage.locator('[name="preferred-city"]')).toHaveAttribute('data-selected-value', '杭州市');
   await expect(beisenPage.locator('[name="current-city"]')).toHaveAttribute('data-selected-value', '杭州市');
   await expect(beisenPage.locator('[name="native-place"]')).toHaveAttribute('data-selected-value', '苏州市');
+  await expect(beisenPage.locator('[name="student-origin"]')).toHaveAttribute('data-selected-value', '苏州市');
+  await expect(beisenPage.locator('[name="highest-education-type"]')).toHaveAttribute('data-selected-value', '全国普通高等院校全日制');
+  await expect(beisenPage.locator('[name="highest-graduation-date"]')).not.toHaveAttribute('data-selected-value');
+  expect(snapshot.report.fields.find((field) => field.label === '毕业时间')).toEqual(
+    expect.objectContaining({ outcome: 'pending', reasonCode: 'PRECISION_MISMATCH' }),
+  );
+  await expect(beisenPage.locator('[name="english-level"]')).toHaveAttribute('data-selected-value', '大学英语四级');
+  await expect(beisenPage.locator('[name="english-score"]')).toHaveValue('500');
+  await expect(beisenPage.locator('[name="expected-city"]')).toHaveAttribute('data-selected-value', '杭州市');
+  await expect(beisenPage.locator('[name="availability"]')).toHaveAttribute('data-selected-value', '随时到岗');
   await expect(beisenPage.locator('[data-name="gender"] .phoenix-radio--checked')).toHaveText('男');
   await expect(beisenPage.locator('[data-name="relocation"] .phoenix-radio--checked')).toHaveText('否');
   await expect(beisenPage.locator('[name="birth-date"]')).toHaveAttribute('data-selected-value', '2002年4月15日');
@@ -76,7 +89,9 @@ test('北森适配器通过页面控件填写、增加经历并在第二轮稳�
   await expect(beisenPage.locator('[name="education-start-1"]')).toHaveAttribute('data-selected-value', '2024年9月');
   await expect(beisenPage.locator('[name="education-lab-1"]')).toHaveValue('示例网络空间安全实验室');
   await expect(beisenPage.locator('[name="education-student-number-1"]')).toHaveValue('202409000001');
+  await expect(beisenPage.locator('[name="education-topic-1"]')).toHaveValue('智能体系统与软件安全');
   await expect(beisenPage.locator('[name="education-research-1"]')).toHaveValue('智能体系统与软件安全');
+  await expect(beisenPage.locator('[name="education-gpa-1"]')).toHaveValue('3.60');
   await expect(beisenPage.locator('[name="education-advisor-1"]')).toHaveValue('示例导师');
   await expect(beisenPage.locator('[name="education-degree-2"]')).toHaveAttribute('data-selected-value', '本科');
   await expect(beisenPage.locator('[name="education-school-2"]')).toHaveAttribute('data-selected-value', '示例工程学院');
@@ -86,6 +101,8 @@ test('北森适配器通过页面控件填写、增加经历并在第二轮稳�
   await expect(beisenPage.locator('[name="internship-company-1"]')).toHaveValue('云笺科技（虚构）');
   await expect(beisenPage.locator('[data-repeated="projects"] [data-record]')).toHaveCount(2);
   await expect(beisenPage.locator('[name="project-name-1"]')).toHaveValue('示例知识检索助手');
+  await expect(beisenPage.locator('[name="project-role-1"]')).toHaveValue('独立开发');
+  await expect(beisenPage.locator('[name="project-result-1"]')).toHaveValue('使用 Python 实现一个虚构的文档检索演示，包含导入、查询和结果展示。');
   await expect(beisenPage.locator('[name="project-present-1"]')).toBeChecked();
   await expect(beisenPage.locator('[name="award-name-1"]')).toHaveValue('示例创新实践奖（虚构）');
   await expect(beisenPage.locator('[name="publication-name-1"]')).toHaveValue('示例智能检索框架研究（虚构）');
@@ -99,6 +116,11 @@ test('北森适配器通过页面控件填写、增加经历并在第二轮稳�
   expect(received['preferred-city']).toBe('杭州市');
   expect(received['current-city']).toBe('杭州市');
   expect(received['native-place']).toBe('苏州市');
+  expect(received['student-origin']).toBe('苏州市');
+  expect(received['highest-education-type']).toBe('全国普通高等院校全日制');
+  expect(received['english-level']).toBe('大学英语四级');
+  expect(received['expected-city']).toBe('杭州市');
+  expect(received['availability']).toBe('随时到岗');
   expect(received['education-student-number-1']).toBe('202409000001');
   expect(received['education-start-1']).toBe('2024年9月');
   expect(received['gender']).toBe('男');

@@ -9,6 +9,8 @@ export interface SectionBinding {
   sectionInstanceId: string;
   root: Element;
   headingText: string;
+  /** 标题与内容相邻时用这些 DOM 子树限定范围，不修改网页、不借整个父容器串区。 */
+  contentRoots: Element[];
 }
 
 export interface RecordContainer {
@@ -81,6 +83,17 @@ const NON_SECTION_ROOTS = new Set(['main', 'body', 'html', 'article', 'header', 
 /** 分区标题是短标题；页面标题一类的长句不算分区。 */
 const MAX_HEADING_LENGTH = 20;
 
+/** 无语义标签的短分区标题只接受完整词，不把“学校名称”等字段名升级成分区。 */
+const PLAIN_SECTION_TITLE = /^(?:基本信息|基础信息|个人信息|联系方式|教育(?:经历|背景|信息)|实习(?:经历|经验)|工作经历|项目(?:经历|经验)|获奖(?:情况|经历)|荣誉奖项|语言能力|语言技能|论文(?:发表|成果|信息)?|论文\/专著|证书(?:信息)?|资格证书|求职意向|自我评价|自我介绍|校园经历|在校经历|专利(?:成果|信息)?|技能(?:证书)?|其他信息|招聘信息来源|简历附件)$/;
+
+function eligibleHeading(element: Element): boolean {
+  if (isOwnElement(element) || !isVisible(element) || element.closest('nav, a, button, label, [role="tablist"], [role="dialog"]')) return false;
+  if (element.querySelector('input, textarea, select, [role="combobox"], .am-list-item')) return false;
+  const text = headingTextOf(element).replace(/[＊*：:]$/u, '').trim();
+  return text.length > 0 && text.length <= MAX_HEADING_LENGTH &&
+    (element.matches(HEADING_SELECTOR) || PLAIN_SECTION_TITLE.test(text));
+}
+
 /** 标题所属的分区容器：legend 归 fieldset，其余归父元素。 */
 function rootForHeading(heading: Element): Element | null {
   if (heading.tagName.toLowerCase() === 'legend') {
@@ -103,6 +116,8 @@ interface SectionCandidate {
   root: Element;
   headingText: string;
   depth: number;
+  contentRoots: Element[];
+  key: Element;
 }
 
 function depthOf(element: Element): number {
@@ -119,6 +134,38 @@ function countControls(container: Element, controls: Element[]): number {
   let count = 0;
   for (const control of controls) if (container.contains(control)) count += 1;
   return count;
+}
+
+function hasAddButton(root: Element): boolean {
+  return [...root.querySelectorAll('button, a, [role="button"]'), ...(root.matches('button, a, [role="button"]') ? [root] : [])]
+    .some((button) => isVisible(button) && /^\+?\s*(?:添加|新增)(?:经历)?$/.test(normalizeText(button.textContent ?? '')));
+}
+
+export function sectionContains(section: SectionBinding, element: Element): boolean {
+  return section.contentRoots.some((root) => root.contains(element));
+}
+
+/** 标题可能单独包在装饰容器中；仅沿最多三层找同级内容，到任何下一个标题即停止。 */
+function siblingContent(heading: Element, headings: Element[], controls: Element[]): { root: Element; contentRoots: Element[] } | null {
+  let marker = heading;
+  for (let hop = 0; hop < 3 && marker.parentElement; hop += 1) {
+    const roots: Element[] = [];
+    let next = marker.nextElementSibling;
+    while (next) {
+      if (headings.some((other) => other !== heading && next!.contains(other)) ||
+          next.matches('nav, footer, header, [role="dialog"]')) break;
+      if (!isOwnElement(next)) roots.push(next);
+      next = next.nextElementSibling;
+    }
+    const hasContent = roots.some((node) => controls.some((control) => node.contains(control)) || hasAddButton(node));
+    if (hasContent) return { root: marker.parentElement, contentRoots: roots };
+    const parent = marker.parentElement;
+    // 只越过单个标题的纯装饰包装，不能越过已有字段/其它标题进入另一个区域。
+    if (controls.some((control) => parent.contains(control)) ||
+        headings.some((other) => other !== heading && parent.contains(other))) break;
+    marker = parent;
+  }
+  return null;
 }
 
 /**
@@ -149,22 +196,39 @@ const REPEATED_SECTIONS: SectionKind[] = [
 
 export function analyzeStructure(root: ParentNode, controls: Element[]): StructureAnalysis {
   const candidates: SectionCandidate[] = [];
-  for (const heading of root.querySelectorAll(HEADING_SELECTOR)) {
-    if (isOwnElement(heading) || !isVisible(heading)) continue;
+  const allHeadings = [...root.querySelectorAll(`${HEADING_SELECTOR}, div, span, p, strong`)].filter(eligibleHeading);
+  // 已有的语义/平台标题优先保留（其父级才是分区）；仅对纯文本包装取最内层。
+  const headings = allHeadings.filter((heading) => !allHeadings.some((other) =>
+    other !== heading && headingTextOf(other) === headingTextOf(heading) && (
+      (other.contains(heading) && other.matches(HEADING_SELECTOR)) ||
+      (heading.contains(other) && !heading.matches(HEADING_SELECTOR))
+    )));
+  for (const heading of headings) {
     const text = headingTextOf(heading);
-    if (text.length > MAX_HEADING_LENGTH) continue;
-    const section = sectionFromHeading(text);
-    if (!section) continue;
+    const kinds = SECTION_KEYWORDS.filter((entry) => entry.patterns.test(text));
+    const section = kinds.length === 1 ? kinds[0]!.section : 'unknown';
     const container = rootForHeading(heading);
-    if (!container || isOwnElement(container)) continue;
-    candidates.push({ section, root: container, headingText: text, depth: depthOf(container) });
+    const foreignHeading = container && headings.some((other) => other !== heading && container.contains(other) &&
+      sectionFromHeading(headingTextOf(other)) !== section);
+    if (container && !foreignHeading && (controls.some((control) => container.contains(control)) || hasAddButton(container))) {
+      candidates.push({ section, root: container, contentRoots: [container], key: container,
+        headingText: text, depth: depthOf(container) });
+      continue;
+    }
+    const sibling = siblingContent(heading, headings, controls);
+    if (sibling) {
+      candidates.push({ section, ...sibling, key: heading, headingText: text, depth: depthOf(sibling.root) + 1 });
+    } else if (container && !foreignHeading) {
+      candidates.push({ section, root: container, contentRoots: [container], key: container,
+        headingText: text, depth: depthOf(container) });
+    }
   }
 
   // 同一容器只保留最具体的一个标题。
   const byRoot = new Map<Element, SectionCandidate>();
   for (const candidate of candidates) {
-    const existing = byRoot.get(candidate.root);
-    if (!existing || candidate.depth > existing.depth) byRoot.set(candidate.root, candidate);
+    const existing = byRoot.get(candidate.key);
+    if (!existing || candidate.depth > existing.depth) byRoot.set(candidate.key, candidate);
   }
   const unique = [...byRoot.values()].sort((a, b) => b.depth - a.depth);
 
@@ -173,6 +237,7 @@ export function analyzeStructure(root: ParentNode, controls: Element[]): Structu
     sectionInstanceId: `sec-${index}`,
     root: candidate.root,
     headingText: candidate.headingText,
+    contentRoots: candidate.contentRoots,
   }));
 
   // 控件归属最内层的分区。
@@ -181,8 +246,8 @@ export function analyzeStructure(root: ParentNode, controls: Element[]): Structu
     let best: SectionBinding | null = null;
     let bestDepth = -1;
     for (const section of sections) {
-      if (!section.root.contains(control)) continue;
-      const depth = depthOf(section.root);
+      if (!sectionContains(section, control)) continue;
+      const depth = Math.max(...section.contentRoots.filter((node) => node.contains(control)).map(depthOf));
       if (depth > bestDepth) {
         best = section;
         bestDepth = depth;
@@ -205,15 +270,25 @@ export function analyzeStructure(root: ParentNode, controls: Element[]): Structu
   for (const [kind, bindings] of grouped) {
     // 排除只作为外层包裹的分区根（其内部还有同类分区）。
     const leaves = bindings.filter(
-      (binding) => !bindings.some((other) => other !== binding && binding.root.contains(other.root)),
+      (binding) => !bindings.some((other) => other !== binding &&
+        other.contentRoots.every((node) => sectionContains(binding, node))),
     );
     const containers: Array<{ element: Element; binding: SectionBinding }> = [];
     if (leaves.length > 1) {
-      for (const binding of leaves) containers.push({ element: binding.root, binding });
+      for (const binding of leaves) {
+        for (const element of binding.contentRoots) {
+          if (controls.some((control) => sectionOfControl.get(control) === binding && element.contains(control))) {
+            containers.push({ element, binding });
+          }
+        }
+      }
     } else if (leaves.length === 1) {
       const binding = leaves[0]!;
       const owned = controls.filter((control) => sectionOfControl.get(control) === binding);
-      for (const element of findRecordContainers(binding.root, owned)) containers.push({ element, binding });
+      for (const root of binding.contentRoots) {
+        if (!owned.some((control) => root.contains(control))) continue;
+        for (const element of findRecordContainers(root, owned)) containers.push({ element, binding });
+      }
     }
 
     containers.forEach((entry, index) => {

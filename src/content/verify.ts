@@ -26,6 +26,7 @@ export const failResult = (reasonCode: ReasonCode, message: string): ControlResu
 /** 读取控件当前值，仅用于本次比较，不写入日志。 */
 export function readCurrentValue(entry: ControlEntry): string {
   const element = entry.primary;
+  if (entry.component?.readValue) return entry.component.readValue(element);
   switch (entry.kind) {
     case 'radio': {
       const checked = entry.elements.find(isChoiceChecked);
@@ -74,7 +75,9 @@ export function revalidateTarget(entry: ControlEntry): ControlResult {
     return failResult('STALE_PAGE', '字段当前不可见');
   }
   const input = element as HTMLInputElement;
-  if (input.disabled) return failResult('REQUIRES_USER_ACTION', '字段已被网页禁用');
+  if (input.disabled || element.getAttribute('aria-disabled') === 'true' || entry.component?.isDisabled?.(element)) {
+    return failResult('REQUIRES_USER_ACTION', '字段已被网页禁用');
+  }
   if (input.readOnly && entry.kind !== 'date-picker') return failResult('REQUIRES_USER_ACTION', '字段是只读的');
   return okResult();
 }

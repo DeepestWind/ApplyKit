@@ -6,7 +6,6 @@ import { fillCombobox } from './controls/combobox';
 import { areaValuesEqual } from './controls/area-picker';
 import { fillCheckbox, fillRadio } from './controls/choice';
 import { fillDateInput } from './controls/date';
-import { fillDatePicker } from './controls/date-picker';
 import { fillSelect } from './controls/select';
 import { fillText } from './controls/text';
 import { delay, readValidationError, waitFor } from './dom-utils';
@@ -148,6 +147,10 @@ function currentFingerprint(entry: ControlEntry): string {
 
 async function applyAction(entry: ControlEntry, action: FillAction, replaceGeneratedDefault = false): Promise<ControlResult> {
   const overwrite = action.overwrite === 'user-approved' || replaceGeneratedDefault;
+  if (entry.component) {
+    if (entry.component.kind !== action.kind) return failResult('STALE_PAGE', '控件类型发生了变化');
+    return entry.component.fill(entry, Array.isArray(action.value) ? action.value : [String(action.value)], overwrite);
+  }
   switch (action.kind) {
     case 'text':
     case 'textarea':
@@ -162,7 +165,7 @@ async function applyAction(entry: ControlEntry, action: FillAction, replaceGener
     case 'month':
       return fillDateInput(entry, String(action.value), overwrite);
     case 'date-picker':
-      return fillDatePicker(entry, String(action.value), overwrite);
+      return failResult('UNSUPPORTED_WIDGET', '没有可验证的日期组件驱动');
     case 'combobox':
       return fillCombobox(entry, Array.isArray(action.value) ? action.value : [String(action.value)], overwrite);
     case 'unsupported':

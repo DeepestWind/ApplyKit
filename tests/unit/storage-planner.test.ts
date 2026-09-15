@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { ProfileFile } from '../../src/shared/types';
 import type { ScanResult } from '../../src/shared/protocol';
+import { scanResultSchema } from '../../src/shared/protocol';
 import { planRun } from '../../src/background/planner';
 import { fieldFingerprint, formFingerprint } from '../../src/shared/fingerprints';
 import { normalizeLabel } from '../../src/shared/normalize';
@@ -171,6 +172,17 @@ function scanOf(descriptors: FieldDescriptor[], over: Partial<ScanResult> = {}):
 }
 
 describe('计划生成', () => {
+  it('未展开分区的诊断进入报告提示，但不生成新增或填入动作', () => {
+    const diagnostics = ['教育经历尚未展开字段，请先在网页添加经历，再重新扫描；本轮未自动点击添加。'];
+    const scan = scanResultSchema.parse(scanOf([], { diagnostics }));
+    const plan = planRun({ scan, profile: demoProfile, rules: [] });
+    expect(plan.recordBindingNotes).toEqual(diagnostics);
+    expect(plan.actions).toEqual([]);
+    expect(plan.addRequests).toEqual([]);
+    expect(scanResultSchema.safeParse(scanOf([])).success).toBe(true);
+    expect(scanResultSchema.safeParse(scanOf([], { diagnostics: Array(31).fill('提示') })).success).toBe(false);
+  });
+
   it('每个字段落在且仅落在一个结果中，动作与待处理项之和等于字段数', () => {
     const descriptors = [
       descriptor({ fieldId: 'f1', label: '姓名', section: 'personal' }),
@@ -247,6 +259,68 @@ describe('计划生成', () => {
     });
     const plan = planRun({ scan, profile: demoProfile, rules: [] });
     expect(plan.addRequests).toHaveLength(0);
+  });
+
+  it('网页多出的完全空白经历保留结果但按记录标记为可折叠提示', () => {
+    const descriptors = ['edu-0', 'edu-1', 'edu-2'].map((recordInstanceId, index) => descriptor({
+      fieldId: `school-${index}`,
+      label: '学校名称',
+      section: 'education',
+      recordInstanceId,
+    }));
+    const scan = scanOf(descriptors, {
+      recordInstances: ['edu-0', 'edu-1', 'edu-2'].map((recordInstanceId, order) => ({
+        section: 'education' as const,
+        sectionInstanceId: 'sec-0',
+        recordInstanceId,
+        degreeHint: null,
+        identityHint: null,
+        order,
+      })),
+      orderFallbackSections: ['education'],
+    });
+    const plan = planRun({ scan, profile: demoProfile, rules: [] });
+    expect(plan.excessEmptyRecordInstanceIds).toEqual(['edu-2']);
+    expect(plan.recordBindingNotes).toContain(
+      '教育经历：网页多出 1 条完全空白的记录，履历中没有对应经历；详情已按记录折叠，请在网页删除空记录或手动补充。',
+    );
+    expect(plan.results).toEqual([
+      expect.objectContaining({ fieldId: 'school-2', reasonCode: 'SOURCE_MISSING' }),
+    ]);
+  });
+
+  it('网页已经勾选至今时不再重复报告同一条记录的空结束日期', () => {
+    const endDate = descriptor({
+      fieldId: 'project-end',
+      label: '结束时间',
+      section: 'projects',
+      controlKind: 'date-picker',
+      recordInstanceId: 'project-0',
+    });
+    const checkedPresent = {
+      ...descriptor({
+        fieldId: 'project-present',
+        label: '结束时间至今',
+        section: 'projects',
+        controlKind: 'checkbox',
+        recordInstanceId: 'project-0',
+        empty: false,
+      }),
+      disabled: true,
+    };
+    const scan = scanOf([endDate, checkedPresent], {
+      recordInstances: [{
+        section: 'projects',
+        sectionInstanceId: 'sec-0',
+        recordInstanceId: 'project-0',
+        degreeHint: null,
+        identityHint: null,
+        order: 0,
+      }],
+      orderFallbackSections: ['projects'],
+    });
+    const plan = planRun({ scan, profile: demoProfile, rules: [] });
+    expect(plan.results.map((result) => result.fieldId)).toEqual(['project-present']);
   });
 
   it('计划里不含任何模型调用或可执行片段', () => {

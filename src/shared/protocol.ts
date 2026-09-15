@@ -86,6 +86,7 @@ export const scanResultSchema = z
     truncated: z.boolean(),
     truncationReason: z.string().max(200).nullable(),
     formFingerprint: z.string().max(120),
+    diagnostics: z.array(z.string().max(200)).max(30).optional(),
   })
   .strict();
 

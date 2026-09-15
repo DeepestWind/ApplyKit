@@ -165,7 +165,9 @@ const SELECT_LIKE_PLACEHOLDER = /^(请选择|请选取|请选|选择|please\s*se
 const SELECT_LIKE_CONTAINER = /(^|[-_ ])(select|dropdown|cascader|combobox|auto-?complete)([-_ ]|$)/i;
 /** 日期/时间选择器：结构是日历而不是选项列表，不能按下拉处理。 */
 const DATE_LIKE_CONTAINER = /(^|[-_ ])(date-?picker|date-?input|calendar|time-?picker|month-?picker|date-?range)([-_ ]|$)/i;
-const DATE_LIKE_TEXT = /(日期|时间|年月)/;
+// “到岗时间”“可工作时间”等也常是普通枚举下拉。只有明确的日期词或
+// 开始/结束端点才按日期控件处理；日期组件类名仍具有最高优先级。
+const DATE_LIKE_TEXT = /(日期|年月|开始时间|结束时间|起始时间|入学时间|毕业时间|获奖时间|发布时间|获得时间|考试时间)/;
 
 export type SelectLikeKind = 'custom-select' | 'date-picker';
 

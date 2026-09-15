@@ -619,5 +619,6 @@ export async function fillDatePicker(
   if (entry.datePickerKind === 'feishu-year') {
     return fillFeishuYear(entry, value, overwrite);
   }
-  return fillMokaDatePicker(entry, value, overwrite);
+  if (entry.datePickerKind === 'moka-month') return fillMokaDatePicker(entry, value, overwrite);
+  return failResult('UNSUPPORTED_WIDGET', '没有可验证的日期组件驱动');
 }

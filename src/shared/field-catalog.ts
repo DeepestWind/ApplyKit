@@ -53,10 +53,15 @@ const NATIONALITY_EQUIVALENTS: Record<string, string[]> = {
 };
 
 const EDUCATION_TYPE_EQUIVALENTS: Record<string, string[]> = {
-  fullTimeUnified: ['全日制统招', '统招全日制', '全日制', '统招'],
+  fullTimeUnified: ['全日制统招', '统招全日制', '全国普通高等院校全日制', '普通高等院校全日制', '全日制', '统招'],
   fullTime: ['全日制'],
   partTime: ['非全日制', '在职'],
   other: ['其他'],
+};
+
+const ENGLISH_LEVEL_EQUIVALENTS: Record<string, string[]> = {
+  'CET-4': ['CET-4', 'CET4', '大学英语四级', '英语四级', '四级'],
+  'CET-6': ['CET-6', 'CET6', '大学英语六级', '英语六级', '六级'],
 };
 
 export const CATALOG: CatalogSection[] = [
@@ -78,10 +83,31 @@ export const CATALOG: CatalogSection[] = [
         aliases: ['最高学历', '最高学位', '最高教育程度'],
         enumEquivalents: DEGREE_EQUIVALENTS,
       },
+      {
+        field: 'highestEducationType',
+        label: '最高学历学习形式',
+        valueKind: 'enum',
+        aliases: ['学习形式', '最高学历学习形式'],
+        enumEquivalents: EDUCATION_TYPE_EQUIVALENTS,
+      },
+      {
+        field: 'highestEducationEndDate',
+        label: '最高学历毕业时间',
+        valueKind: 'date',
+        aliases: ['毕业时间', '最高学历毕业时间'],
+      },
       { field: 'birthDate', label: '出生日期', valueKind: 'date', aliases: ['出生日期', '出生日期年龄', '出生日期 (年龄)', '生日', 'birth date', 'date of birth'] },
       { field: 'age', label: '年龄', valueKind: 'number', aliases: ['年龄', '周岁', 'age'] },
       { field: 'currentCity', label: '现居城市', valueKind: 'text', aliases: ['现居城市', '现居地', '现居住地', '当前城市', '所在城市', '所在地', '常住城市', 'current city'] },
-      { field: 'nativePlace', label: '籍贯', valueKind: 'text', aliases: ['籍贯', '祖籍', 'native place', 'hometown'] },
+      { field: 'nativePlace', label: '籍贯', valueKind: 'text', aliases: ['籍贯', '生源地', '祖籍', 'native place', 'hometown'] },
+      {
+        field: 'englishLevel',
+        label: '英语等级',
+        valueKind: 'enum',
+        aliases: ['英语等级', '英语考试等级'],
+        enumEquivalents: ENGLISH_LEVEL_EQUIVALENTS,
+      },
+      { field: 'englishScore', label: '英语等级成绩', valueKind: 'text', aliases: ['英语等级成绩', '英语成绩'] },
       { field: 'recentCompany', label: '最近公司', valueKind: 'text', aliases: ['最近公司', '最近任职公司', '最近工作单位'] },
       { field: 'homepage', label: '个人主页', valueKind: 'text', aliases: ['个人主页', '主页', '作品集', 'homepage', 'portfolio', '个人网站'] },
       { field: 'github', label: 'GitHub', valueKind: 'text', aliases: ['github', 'github 主页', '代码仓库'] },
@@ -97,7 +123,7 @@ export const CATALOG: CatalogSection[] = [
     fields: [
       { field: 'targetRoles', label: '意向岗位', valueKind: 'stringList', aliases: ['意向岗位', '期望岗位', '求职意向', '目标岗位', '应聘岗位方向'] },
       { field: 'preferredCities', label: '意向城市列表', valueKind: 'stringList', aliases: ['意向城市列表', '多选意向城市'] },
-      { field: 'primaryPreferredCity', label: '默认意向城市', valueKind: 'text', aliases: ['意向城市', '期望城市', '期望工作地点', '意向工作城市', '意向工作地点'] },
+      { field: 'primaryPreferredCity', label: '默认意向城市', valueKind: 'text', aliases: ['意向城市', '期望城市', '期望工作城市', '期望工作地点', '意向工作城市', '意向工作地点'] },
       { field: 'currentSalary', label: '当前薪资', valueKind: 'text', aliases: ['当前薪资', '现薪', '目前薪资'] },
       { field: 'expectedSalary', label: '期望薪资', valueKind: 'text', aliases: ['期望薪资', '期望月薪', '预期薪资'] },
       { field: 'availabilityText', label: '到岗说明', valueKind: 'text', aliases: ['到岗时间', '可到岗时间', '入职时间', '到岗说明', 'availability'] },
@@ -119,17 +145,17 @@ export const CATALOG: CatalogSection[] = [
       { field: 'department', label: '院系', valueKind: 'text', aliases: ['院系', '学院', '学院名称', '所在院系', 'department'] },
       { field: 'degreeLevel', label: '学历层级', valueKind: 'enum', aliases: ['学历', '学历层次', '最高学历', '培养层次', 'degree'], enumEquivalents: DEGREE_EQUIVALENTS },
       { field: 'enrollmentStatus', label: '就读状态', valueKind: 'enum', aliases: ['就读状态', '在读状态', '学籍状态'], enumEquivalents: ENROLLMENT_EQUIVALENTS },
-      { field: 'isHighestDegree', label: '是否为最高学历', valueKind: 'boolean', aliases: ['是否为最高学历', '最高学历经历'] },
+      { field: 'isHighestDegree', label: '是否为最高学历', valueKind: 'boolean', aliases: ['是否为最高学历', '是否最高学历', '最高学历经历'] },
       { field: 'major', label: '专业', valueKind: 'text', aliases: ['专业', '所学专业', '专业名称', 'major'] },
       { field: 'startDate', label: '入学时间', valueKind: 'date', aliases: ['入学时间', '入学日期', '开始时间', '起始时间', '教育开始时间'] },
       { field: 'endDate', label: '毕业时间', valueKind: 'date', aliases: ['毕业时间', '预计毕业时间', '毕业日期', '结束时间', '教育结束时间'] },
-      { field: 'gpa', label: 'GPA', valueKind: 'text', aliases: ['gpa', '绩点', '平均绩点', '成绩'] },
+      { field: 'gpa', label: 'GPA', valueKind: 'text', aliases: ['gpa', '成绩(gpa)', '绩点', '平均绩点', '成绩'] },
       { field: 'gpaScale', label: 'GPA 满分', valueKind: 'text', aliases: ['gpa 满分', '绩点满分', '满分制'] },
       { field: 'description', label: '教育描述', valueKind: 'longText', aliases: ['教育描述', '在校经历', '主修课程'] },
       { field: 'educationType', label: '学历类型', valueKind: 'enum', aliases: ['学历类型', '培养方式', '学习形式'], enumEquivalents: EDUCATION_TYPE_EQUIVALENTS },
-      { field: 'majorRanking', label: '专业排名', valueKind: 'text', aliases: ['专业排名', '成绩排名', '排名'] },
+      { field: 'majorRanking', label: '专业排名', valueKind: 'text', aliases: ['专业排名', '专业成绩排名', '成绩排名', '排名'] },
       { field: 'lab', label: '实验室', valueKind: 'text', aliases: ['实验室', '所属实验室'] },
-      { field: 'researchDirection', label: '研究方向', valueKind: 'text', aliases: ['研究方向', '本人研究方向'] },
+      { field: 'researchDirection', label: '研究方向', valueKind: 'text', aliases: ['研究方向', '本人研究方向', '课题研究'] },
       { field: 'advisor', label: '导师', valueKind: 'text', aliases: ['导师', '指导教师'] },
       { field: 'advisorResearchDirection', label: '导师研究方向', valueKind: 'text', aliases: ['导师研究方向'] },
       { field: 'studentNumber', label: '学号', valueKind: 'text', aliases: ['学号', '学生编号', 'student number', 'student id'] },
@@ -169,11 +195,11 @@ export const CATALOG: CatalogSection[] = [
     repeated: true,
     fields: [
       { field: 'name', label: '项目名称', valueKind: 'text', aliases: ['项目名称', '项目名', '项目', 'project name'] },
-      { field: 'role', label: '项目角色', valueKind: 'text', aliases: ['项目职责', '担任角色', '项目角色', '担任职务', '职责', '项目中职责', 'role'] },
+      { field: 'role', label: '项目角色', valueKind: 'text', aliases: ['项目职责', '担任角色', '项目角色', '担任职务', '职务', '职责', '项目中职责', 'role'] },
       { field: 'startDate', label: '项目开始时间', valueKind: 'date', aliases: ['项目开始时间', '开始时间', '起始时间'] },
       { field: 'endDate', label: '项目结束时间', valueKind: 'endDate', aliases: ['项目结束时间', '结束时间', '至今'] },
       { field: 'url', label: '项目链接', valueKind: 'text', aliases: ['项目链接', '项目地址', '演示地址', 'project url'] },
-      { field: 'description', label: '项目描述', valueKind: 'longText', aliases: ['项目描述', '项目介绍', '项目内容'] },
+      { field: 'description', label: '项目描述', valueKind: 'longText', aliases: ['项目描述', '项目介绍', '项目内容', '项目成果'] },
     ],
   },
   {
@@ -282,6 +308,20 @@ function highestDegreeOf(data: ProfileData): DegreeLevel | null {
   return highest;
 }
 
+/** 传音等北森表单会把最高学历详情投影到个人信息区。 */
+function highestEducationOf(data: ProfileData): ProfileData['education'][number] | null {
+  const highestDegree = highestDegreeOf(data);
+  if (!highestDegree) return null;
+  const candidates = data.education.filter((record) => record.degreeLevel === highestDegree);
+  return candidates.find((record) => record.primary) ?? candidates[0] ?? null;
+}
+
+/** 英语等级与成绩只从已保存的英语语言记录读取。 */
+function englishLanguageOf(data: ProfileData): ProfileData['languages'][number] | null {
+  const records = data.languages.filter((record) => /^(?:英语|english)$/i.test(record.language.trim()));
+  return records.find((record) => record.primary) ?? records[0] ?? null;
+}
+
 /** “在校生”直接来自已审阅教育记录的在读状态，不根据年龄或日期猜测。 */
 function workExperienceOf(data: ProfileData): string | null {
   if (data.personal.workExperience) return data.personal.workExperience;
@@ -322,8 +362,18 @@ export function readFieldValue(data: ProfileData, ref: FieldRef): CatalogValue {
   if (ref.section === 'selfIntroduction') {
     raw = data.selfIntroduction;
   } else if (ref.section === 'personal') {
+    const highestEducation = highestEducationOf(data);
+    const english = englishLanguageOf(data);
     raw = ref.field === 'highestDegree'
       ? highestDegreeOf(data)
+      : ref.field === 'highestEducationType'
+        ? highestEducation?.educationType
+        : ref.field === 'highestEducationEndDate'
+          ? highestEducation?.endDate
+          : ref.field === 'englishLevel'
+            ? english?.certificate
+            : ref.field === 'englishScore'
+              ? english?.score
       : ref.field === 'workExperience'
         ? workExperienceOf(data)
         : ref.field === 'recentCompany'

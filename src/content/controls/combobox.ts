@@ -1,7 +1,6 @@
 import { normalizeLabel, normalizeText } from '../../shared/normalize';
 import { isVisible, nextFrames, waitFor } from '../dom-utils';
 import { fillCustomSelect } from './custom-select';
-import { fillAreaPicker, fillFeishuAreaPicker } from './area-picker';
 import type { ControlEntry } from '../scanner';
 import { failResult, okResult, readCurrentValue, type ControlResult } from '../verify';
 
@@ -35,12 +34,6 @@ export async function fillCombobox(
   acceptable: string[],
   overwrite: boolean,
 ): Promise<ControlResult> {
-  if (entry.areaPickerKind === 'beisen-phoenix-area') {
-    return fillAreaPicker(entry, acceptable, overwrite);
-  }
-  if (entry.areaPickerKind === 'feishu-tree-area') {
-    return fillFeishuAreaPicker(entry, acceptable, overwrite);
-  }
   const element = entry.primary;
   const current = readCurrentValue(entry);
   const wanted = new Set(acceptable.map((item) => normalizeLabel(item).toLowerCase()).filter(Boolean));

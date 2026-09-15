@@ -71,6 +71,8 @@ function visiblePhoenixPopup(document: Document, selector: string): Element | nu
 
 const BINDINGS = new Map<string, FieldBinding>([
   ['意向工作地点', { section: 'preferences', field: 'primaryPreferredCity' }],
+  ['期望工作城市', { section: 'preferences', field: 'primaryPreferredCity' }],
+  ['到岗时间', { section: 'preferences', field: 'availabilityText' }],
   ['其他意向城市1', { section: 'preferences', field: 'secondaryPreferredCity1' }],
   ['其他意向城市2', { section: 'preferences', field: 'secondaryPreferredCity2' }],
   ['擅长的开发语言1', { section: 'preferences', field: 'primaryDevelopmentLanguage' }],
@@ -78,7 +80,12 @@ const BINDINGS = new Map<string, FieldBinding>([
   ['是否接受工作城市调剂', { section: 'preferences', field: 'acceptsRelocation' }],
   ['国籍/地区', { section: 'personal', field: 'nationality' }],
   ['籍贯', { section: 'personal', field: 'nativePlace' }],
+  ['生源地', { section: 'personal', field: 'nativePlace' }],
   ['现居住地', { section: 'personal', field: 'currentCity' }],
+  ['学习形式', { section: 'personal', field: 'highestEducationType' }],
+  ['毕业时间', { section: 'personal', field: 'highestEducationEndDate' }],
+  ['英语等级', { section: 'personal', field: 'englishLevel' }],
+  ['英语等级成绩', { section: 'personal', field: 'englishScore' }],
   ['微信号', { section: 'personal', field: 'wechat' }],
   ['学院名称', { section: 'education', field: 'department' }],
   ['是否为最高学历', { section: 'education', field: 'isHighestDegree' }],
@@ -86,10 +93,14 @@ const BINDINGS = new Map<string, FieldBinding>([
   ['专业排名', { section: 'education', field: 'majorRanking' }],
   ['实验室', { section: 'education', field: 'lab' }],
   ['研究方向', { section: 'education', field: 'researchDirection' }],
+  ['课题研究', { section: 'education', field: 'researchDirection' }],
+  ['成绩(GPA)', { section: 'education', field: 'gpa' }],
   ['导师', { section: 'education', field: 'advisor' }],
   ['学号', { section: 'education', field: 'studentNumber' }],
   ['实践名称', { section: 'projects', field: 'name' }],
+  ['职务', { section: 'projects', field: 'role' }],
   ['实践描述', { section: 'projects', field: 'description' }],
+  ['项目成果', { section: 'projects', field: 'description' }],
   ['获奖项', { section: 'awards', field: 'name' }],
   ['获奖描述', { section: 'awards', field: 'description' }],
   ['名称', { section: 'publications', field: 'name' }],
@@ -107,8 +118,9 @@ const BINDINGS = new Map<string, FieldBinding>([
  *
  * 只把前者送进 area-picker 执行器，后者由普通下拉精确匹配。
  */
-const AREA_PICKER_LABEL = /^(?:现居住地|籍贯)$/;
+const AREA_PICKER_LABEL = /^(?:现居住地|籍贯|生源地)$/;
 const DAY_PICKER_LABEL = /^(?:出生日期|获奖时间|发布时间|获得时间|论文发表日期|证书获取日期)$/;
+const MONTH_PICKER_LABEL = /^(?:开始时间|结束时间|起始时间|入学时间|预计毕业时间|工作开始时间|工作结束时间|实习开始时间|实习结束时间|项目开始时间|项目结束时间)$/;
 
 function jobCandidate(document: Document): JobCandidate | null {
   const roleElement = [...document.querySelectorAll<HTMLElement>('div, span, p')]
@@ -149,8 +161,13 @@ export const beisenAdapter: SiteAdapter = {
   },
   bindField(descriptor: FieldDescriptor): FieldBinding | null {
     const binding = BINDINGS.get(descriptor.normalizedLabel);
-    if (!binding || binding.section !== descriptor.section) return null;
-    return binding;
+    if (binding?.section === descriptor.section) return binding;
+    if (descriptor.controlKind === 'checkbox' && /至今$/.test(descriptor.normalizedLabel)) {
+      if (descriptor.section === 'projects' || descriptor.section === 'internships') {
+        return { section: descriptor.section, field: 'endDate' };
+      }
+    }
+    return null;
   },
   orderFallbackSections(): SectionKind[] {
     return [...REPEATED];
@@ -166,8 +183,12 @@ export const beisenAdapter: SiteAdapter = {
   datePickerKind(element: Element): 'beisen-phoenix-month' | 'beisen-phoenix-day' | null {
     if (!(element instanceof HTMLInputElement) || !element.closest('.phoenix-select')) return null;
     const label = normalizeLabel(element.closest('.form-item')?.querySelector('.form-item__text')?.textContent ?? '');
-    if (!/(日期|时间)/.test(label)) return null;
-    return DAY_PICKER_LABEL.test(label) ? 'beisen-phoenix-day' : 'beisen-phoenix-month';
+    if (DAY_PICKER_LABEL.test(label)) return 'beisen-phoenix-day';
+    if (label === '毕业时间') {
+      const section = sectionRoots(element.ownerDocument).find((item) => item.root.contains(element))?.section;
+      return section === 'personal' ? 'beisen-phoenix-day' : 'beisen-phoenix-month';
+    }
+    return MONTH_PICKER_LABEL.test(label) ? 'beisen-phoenix-month' : null;
   },
   areaPickerKind(element: Element): 'beisen-phoenix-area' | null {
     if (!(element instanceof HTMLInputElement) || !element.closest('.phoenix-select')) return null;

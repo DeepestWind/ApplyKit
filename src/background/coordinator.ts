@@ -205,7 +205,7 @@ export async function prepareRun(input: PrepareRunInput): Promise<PrepareRunOutp
   if (!parsedScan.success) throw new RunError('BAD_SCAN', '网页扫描结果格式不正确');
   let scan = parsedScan.data;
 
-  const notes: string[] = [];
+  const notes: string[] = [...(scan.diagnostics ?? [])];
   if (scan.truncated && scan.truncationReason) notes.push(scan.truncationReason);
 
   const scope: RuleScope = { origin: scan.origin, routeKey: scan.routeKey, formFingerprint: scan.formFingerprint };
@@ -649,6 +649,7 @@ export interface RunSnapshot {
   }>;
   jobCandidate: ScanResult['jobCandidate'];
   notes: string[];
+  excessEmptyRecordInstanceIds: string[];
 }
 
 export async function getRun(runId: string): Promise<RunSnapshot> {
@@ -672,6 +673,7 @@ export async function getRun(runId: string): Promise<RunSnapshot> {
       })),
       jobCandidate: context.scan.jobCandidate,
       notes: context.plan.recordBindingNotes,
+      excessEmptyRecordInstanceIds: context.plan.excessEmptyRecordInstanceIds,
     };
   }
   // worker 重启后从持久化报告恢复摘要；动作不从磁盘重放。
@@ -685,6 +687,7 @@ export async function getRun(runId: string): Promise<RunSnapshot> {
     descriptors: [],
     jobCandidate: null,
     notes: ['扩展后台重启过，字段定位信息需要重新扫描'],
+    excessEmptyRecordInstanceIds: [],
   };
 }
 

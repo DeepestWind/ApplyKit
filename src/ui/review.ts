@@ -51,6 +51,7 @@ interface RunSnapshot {
   }>;
   jobCandidate: { company: string | null; role: string | null; location: string | null; externalJobId: string | null; sourceUrl: string | null } | null;
   notes: string[];
+  excessEmptyRecordInstanceIds: string[];
 }
 
 let filter: string = 'all';
@@ -253,6 +254,35 @@ function ambiguousRecordPanels(
   return panels;
 }
 
+/** 页面预置了比履历更多的空记录时，把整组重复字段合并成一个可行动提示。 */
+function excessEmptyRecordPanels(snapshot: RunSnapshot, visible: FieldResult[]): HTMLElement[] {
+  const excess = new Set(snapshot.excessEmptyRecordInstanceIds);
+  const groups = new Map<string, { section: string; fields: FieldResult[] }>();
+  for (const field of visible) {
+    const descriptor = snapshot.descriptors.find((item) => item.fieldId === field.fieldId);
+    const instanceId = descriptor?.recordInstanceId;
+    if (!instanceId || !excess.has(instanceId)) continue;
+    const group = groups.get(instanceId);
+    if (group) group.fields.push(field);
+    else groups.set(instanceId, { section: field.section, fields: [field] });
+  }
+  return [...groups.values()].map((group) => {
+    const section = getSection(group.section as never);
+    const labels = [...new Set(group.fields.map((field) => field.label))];
+    return el('div', { class: 'field-row outcome-pending' }, [
+      el('div', { class: 'field-head' }, [
+        el('span', { class: 'badge badge-pending', text: '空白记录' }),
+        el('strong', { class: 'field-label', text: `${section?.label ?? group.section} · 多余记录` }),
+        el('span', { class: 'field-meta', text: `${group.fields.length} 个字段已折叠` }),
+      ]),
+      el('div', {
+        class: 'field-reason',
+        text: `履历中没有对应经历。网页字段：${labels.join('、')}。请在网页删除这条空记录，或手动补充后重新扫描。`,
+      }),
+    ]);
+  });
+}
+
 export async function renderReview(runId: string, state: StateView, reload: () => void): Promise<void> {
   const host = byId('view-review');
   clear(host);
@@ -326,7 +356,13 @@ export async function renderReview(runId: string, state: StateView, reload: () =
   if (visible.length === 0) {
     list.append(el('p', { class: 'empty', text: '这个筛选条件下没有字段。' }));
   }
-  for (const field of visible) list.append(fieldRow(field, snapshot, state, reload));
+  const excess = new Set(snapshot.excessEmptyRecordInstanceIds);
+  for (const panel of excessEmptyRecordPanels(snapshot, visible)) list.append(panel);
+  for (const field of visible) {
+    const descriptor = snapshot.descriptors.find((item) => item.fieldId === field.fieldId);
+    if (descriptor?.recordInstanceId && excess.has(descriptor.recordInstanceId)) continue;
+    list.append(fieldRow(field, snapshot, state, reload));
+  }
   host.append(list);
 
   if (snapshot.jobCandidate) {

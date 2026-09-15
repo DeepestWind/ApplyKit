@@ -1,4 +1,5 @@
 import type { DegreeLevel, FieldDescriptor, JobCandidate, KnownSection, SectionKind } from '../../shared/types';
+import type { AreaPickerKind, DatePickerKind } from '../components/types';
 
 /** 站点适配器接口。适配器只提供页面结构上的明确绑定，不能返回可执行脚本。 */
 
@@ -31,14 +32,6 @@ export interface VerifiedAddAction {
   /** 部分 ATS（如北森）使用带明确 addButton id 的可点击 div。 */
   button: HTMLElement;
 }
-
-export type DatePickerKind =
-  | 'moka-month'
-  | 'beisen-phoenix-month'
-  | 'beisen-phoenix-day'
-  | 'feishu-period-month'
-  | 'feishu-year';
-export type AreaPickerKind = 'beisen-phoenix-area' | 'feishu-tree-area';
 
 export interface VerificationResult {
   ok: boolean;
