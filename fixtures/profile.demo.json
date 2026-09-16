@@ -27,7 +27,11 @@
       "gender": "male",
       "workExperience": "应届毕业生",
       "recentCompany": "云笺科技（虚构）",
-      "nativePlace": "江苏省苏州市吴中区"
+      "nativePlace": "江苏省苏州市吴中区",
+      "identityNumber": "320000200001010000",
+      "emergencyContactName": "林家长（虚构）",
+      "emergencyContactPhone": "00000000001",
+      "emergencyContactRelation": "父亲"
     },
     "preferences": {
       "targetRoles": [

@@ -160,7 +160,7 @@ test('网站锁定的账号字段不被改动，并说明原因', async () => {
   expect(reasons.get('姓名')).toContain('网站锁定');
 });
 
-test('证件号码等敏感字段永远待处理', async () => {
+test('通用适配器不会使用履历中的证件号码等敏感字段', async () => {
   const tab = await findDemoTab(appPage, 'ats-style.html');
   const { snapshot } = await runFill(appPage, tab.tabId, profileVersionId);
 

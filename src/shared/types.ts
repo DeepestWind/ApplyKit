@@ -119,6 +119,11 @@ export interface ProfileData {
     recentCompany?: string | null;
     nationality?: string | null;
     wechat?: string | null;
+    /** 用户主动保存的证件号码；只允许经过站点适配器明确绑定的字段读取。 */
+    identityNumber?: string | null;
+    emergencyContactName?: string | null;
+    emergencyContactPhone?: string | null;
+    emergencyContactRelation?: string | null;
   };
   preferences: {
     targetRoles: string[];
@@ -256,7 +261,7 @@ export interface FieldDescriptor {
   recordIdentityHint: string | null;
   /** 不能自动处理时的具体原因，用于给用户看得懂的说明。 */
   unsupportedReason: string | null;
-  /** 敏感信息字段（证件号码、政治面貌等）：不进入履历模型，也绝不自动填写。 */
+  /** 敏感信息字段：默认不自动填写；只有本地白名单字段可由精确站点适配器使用。 */
   sensitive: boolean;
 }
 

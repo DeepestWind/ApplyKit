@@ -221,6 +221,10 @@ export const profileDataSchema = z
         recentCompany: nullableText(200).optional(),
         nationality: nullableText(100).optional(),
         wechat: nullableText(100).optional(),
+        identityNumber: nullableText(100).optional(),
+        emergencyContactName: nullableText(100).optional(),
+        emergencyContactPhone: nullableText(50).optional(),
+        emergencyContactRelation: nullableText(50).optional(),
       })
       .strict(),
     preferences: z

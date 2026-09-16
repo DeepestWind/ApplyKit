@@ -205,6 +205,22 @@ function renderEditor(host: HTMLElement, state: StateView, rerender: () => void)
   personal.append(labelled('籍贯', textInput(data.personal.nativePlace ?? null, (v) => (data.personal.nativePlace = v))));
   personal.append(labelled('国籍', textInput(data.personal.nationality ?? null, (v) => (data.personal.nationality = v))));
   personal.append(labelled('微信号', textInput(data.personal.wechat ?? null, (v) => (data.personal.wechat = v))));
+  personal.append(labelled('证件号码（敏感，仅精确适配站点使用）', textInput(
+    data.personal.identityNumber ?? null,
+    (v) => (data.personal.identityNumber = v),
+  )));
+  personal.append(labelled('紧急联系人（敏感）', textInput(
+    data.personal.emergencyContactName ?? null,
+    (v) => (data.personal.emergencyContactName = v),
+  )));
+  personal.append(labelled('紧急联系电话（敏感）', textInput(
+    data.personal.emergencyContactPhone ?? null,
+    (v) => (data.personal.emergencyContactPhone = v),
+  )));
+  personal.append(labelled('与紧急联系人关系（敏感）', textInput(
+    data.personal.emergencyContactRelation ?? null,
+    (v) => (data.personal.emergencyContactRelation = v),
+  )));
   personal.append(labelled('个人主页', textInput(data.personal.homepage, (v) => (data.personal.homepage = v))));
   personal.append(labelled('GitHub', textInput(data.personal.github, (v) => (data.personal.github = v))));
   host.append(personal);

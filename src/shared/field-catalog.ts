@@ -20,6 +20,10 @@ export interface CatalogField {
   requiresConfirmation?: boolean;
   /** 枚举字段的等价词表：履历值 -> 网页可接受写法。 */
   enumEquivalents?: Record<string, string[]>;
+  /** 敏感字段只有同时得到站点适配器明确绑定时才允许自动填写。 */
+  sensitiveAutofill?: boolean;
+  /** 网页要求完整日期时使用的用户授权默认值；已保存的月/日始终优先。 */
+  dateDefault?: { month: number; day: number };
 }
 
 export interface CatalogSection {
@@ -95,6 +99,7 @@ export const CATALOG: CatalogSection[] = [
         label: '最高学历毕业时间',
         valueKind: 'date',
         aliases: ['毕业时间', '最高学历毕业时间'],
+        dateDefault: { month: 6, day: 30 },
       },
       { field: 'birthDate', label: '出生日期', valueKind: 'date', aliases: ['出生日期', '出生日期年龄', '出生日期 (年龄)', '生日', 'birth date', 'date of birth'] },
       { field: 'age', label: '年龄', valueKind: 'number', aliases: ['年龄', '周岁', 'age'] },
@@ -113,6 +118,22 @@ export const CATALOG: CatalogSection[] = [
       { field: 'github', label: 'GitHub', valueKind: 'text', aliases: ['github', 'github 主页', '代码仓库'] },
       { field: 'nationality', label: '国籍', valueKind: 'enum', aliases: ['国籍', '国籍/地区', '国家/地区', 'nationality'], enumEquivalents: NATIONALITY_EQUIVALENTS },
       { field: 'wechat', label: '微信号', valueKind: 'text', aliases: ['微信', '微信号', 'wechat', 'wechat id'] },
+      {
+        field: 'identityNumber', label: '证件号码', valueKind: 'text',
+        aliases: ['证件号码', '身份证号码', '身份证号'], sensitiveAutofill: true,
+      },
+      {
+        field: 'emergencyContactName', label: '紧急联系人', valueKind: 'text',
+        aliases: ['紧急联系人', '紧急联系人姓名'], sensitiveAutofill: true,
+      },
+      {
+        field: 'emergencyContactPhone', label: '紧急联系电话', valueKind: 'text',
+        aliases: ['紧急联系电话', '紧急联系人电话', '紧急联系人手机号'], sensitiveAutofill: true,
+      },
+      {
+        field: 'emergencyContactRelation', label: '紧急联系人关系', valueKind: 'text',
+        aliases: ['与紧急联系人关系', '紧急联系人关系'], sensitiveAutofill: true,
+      },
       { field: 'noWorkExperience', label: '没有工作经历', valueKind: 'boolean', aliases: ['没有工作经历', '无工作经历'] },
     ],
   },
@@ -147,8 +168,16 @@ export const CATALOG: CatalogSection[] = [
       { field: 'enrollmentStatus', label: '就读状态', valueKind: 'enum', aliases: ['就读状态', '在读状态', '学籍状态'], enumEquivalents: ENROLLMENT_EQUIVALENTS },
       { field: 'isHighestDegree', label: '是否为最高学历', valueKind: 'boolean', aliases: ['是否为最高学历', '是否最高学历', '最高学历经历'] },
       { field: 'major', label: '专业', valueKind: 'text', aliases: ['专业', '所学专业', '专业名称', 'major'] },
-      { field: 'startDate', label: '入学时间', valueKind: 'date', aliases: ['入学时间', '入学日期', '开始时间', '起始时间', '教育开始时间'] },
-      { field: 'endDate', label: '毕业时间', valueKind: 'date', aliases: ['毕业时间', '预计毕业时间', '毕业日期', '结束时间', '教育结束时间'] },
+      {
+        field: 'startDate', label: '入学时间', valueKind: 'date',
+        aliases: ['入学时间', '入学日期', '开始时间', '起始时间', '教育开始时间'],
+        dateDefault: { month: 9, day: 1 },
+      },
+      {
+        field: 'endDate', label: '毕业时间', valueKind: 'date',
+        aliases: ['毕业时间', '预计毕业时间', '毕业日期', '结束时间', '教育结束时间'],
+        dateDefault: { month: 6, day: 30 },
+      },
       { field: 'gpa', label: 'GPA', valueKind: 'text', aliases: ['gpa', '成绩(gpa)', '绩点', '平均绩点', '成绩'] },
       { field: 'gpaScale', label: 'GPA 满分', valueKind: 'text', aliases: ['gpa 满分', '绩点满分', '满分制'] },
       { field: 'description', label: '教育描述', valueKind: 'longText', aliases: ['教育描述', '在校经历', '主修课程'] },

@@ -1,11 +1,11 @@
 import type { CatalogField, CatalogValue } from './field-catalog';
 import { formatEndDate, isPresent, toDateInputValue, toMonthInputValue, toTextValue } from './dates';
 import { normalizeLabel } from './normalize';
-import type { FieldDescriptor, ReasonCode } from './types';
+import type { FieldDescriptor, PartialDate, ReasonCode } from './types';
 
 /**
  * 值投影：把履历中的结构化值转换成某个控件可以接受的表示。
- * 只做 trim、单/多值选择、年月格式与有限等价枚举，不推导新事实。
+ * 只做 trim、单/多值选择、年月格式、用户明确授权的日期默认值与有限等价枚举。
  */
 
 export type Projection =
@@ -85,13 +85,38 @@ function matchOption(
   return { ok: false, reasonCode: 'AMBIGUOUS_OPTION', message: `有 ${distinct.size} 个选项都能对应，需要手动选择` };
 }
 
-function projectDatePart(descriptor: FieldDescriptor, value: CatalogValue): Projection {
+function dateWithDefaultMonth(date: PartialDate, catalogField: CatalogField): PartialDate {
+  if (date.month !== undefined || catalogField.dateDefault === undefined) return date;
+  return { ...date, month: catalogField.dateDefault.month };
+}
+
+function dateWithDefaultDay(
+  date: PartialDate,
+  catalogField: CatalogField,
+): { year: number; month: number; day: number } | null {
+  const withMonth = dateWithDefaultMonth(date, catalogField);
+  if (withMonth.month === undefined) return null;
+  if (withMonth.day !== undefined) {
+    return { year: withMonth.year, month: withMonth.month, day: withMonth.day };
+  }
+  const configured = catalogField.dateDefault;
+  return {
+    year: withMonth.year,
+    month: withMonth.month,
+    // 教育起止日期使用用户指定的 9 月 1 日和 6 月 30 日；其他月精度
+    // 日期在网页强制要求“日”时补为当月 1 日。
+    day: configured && withMonth.month === configured.month ? configured.day : 1,
+  };
+}
+
+function projectDatePart(descriptor: FieldDescriptor, value: CatalogValue, catalogField: CatalogField): Projection {
   const part = descriptor.datePart;
   if (!part) return { ok: false, reasonCode: 'UNSUPPORTED_WIDGET', message: '控件没有明确的年/月角色' };
   if (value.kind === 'endDate' && isPresent(value.value) && descriptor.datePresentValue) {
     return { ok: true, value: descriptor.datePresentValue };
   }
-  const date = value.kind === 'date' ? value.value : value.kind === 'endDate' && !isPresent(value.value) ? value.value : null;
+  const rawDate = value.kind === 'date' ? value.value : value.kind === 'endDate' && !isPresent(value.value) ? value.value : null;
+  const date = rawDate ? dateWithDefaultMonth(rawDate, catalogField) : null;
   if (!date) {
     if (value.kind === 'endDate' && isPresent(value.value)) {
       return { ok: false, reasonCode: 'REQUIRES_USER_ACTION', message: '「至今」需要手动选择对应写法' };
@@ -166,7 +191,7 @@ export function projectValue(
     };
   }
 
-  if (descriptor.datePart) return projectDatePart(descriptor, value);
+  if (descriptor.datePart) return projectDatePart(descriptor, value, catalogField);
 
   switch (descriptor.controlKind) {
     case 'text':
@@ -215,8 +240,9 @@ export function projectValue(
       if (value.kind === 'endDate' && isPresent(value.value)) {
         return { ok: false, reasonCode: 'REQUIRES_USER_ACTION', message: '「至今」不是一个年月日期' };
       }
-      const date = value.kind === 'date' ? value.value : value.kind === 'endDate' ? value.value : null;
-      if (!date || !('year' in date)) return { ok: false, reasonCode: 'SOURCE_MISSING', message: '缺少日期' };
+      const rawDate = value.kind === 'date' ? value.value : value.kind === 'endDate' ? value.value : null;
+      if (!rawDate || !('year' in rawDate)) return { ok: false, reasonCode: 'SOURCE_MISSING', message: '缺少日期' };
+      const date = dateWithDefaultMonth(rawDate, catalogField);
       if (descriptor.datePrecision === 'year') {
         return { ok: true, value: String(date.year) };
       }
@@ -224,12 +250,11 @@ export function projectValue(
         return { ok: false, reasonCode: 'PRECISION_MISMATCH', message: '网页要求精确到月，履历只记录到年' };
       }
       if (descriptor.datePrecision === 'day') {
-        if (date.day === undefined) {
-          return { ok: false, reasonCode: 'PRECISION_MISMATCH', message: '网页要求精确到日，履历只记录到月份，不能补成 1 号' };
-        }
+        const complete = dateWithDefaultDay(date, catalogField);
+        if (!complete) return { ok: false, reasonCode: 'PRECISION_MISMATCH', message: '网页要求精确到日，但履历缺少月份' };
         return {
           ok: true,
-          value: `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`,
+          value: `${complete.year}-${String(complete.month).padStart(2, '0')}-${String(complete.day).padStart(2, '0')}`,
         };
       }
       return { ok: true, value: `${date.year}-${String(date.month).padStart(2, '0')}` };
@@ -238,14 +263,15 @@ export function projectValue(
       if (value.kind === 'endDate' && isPresent(value.value)) {
         return { ok: false, reasonCode: 'REQUIRES_USER_ACTION', message: `「${formatEndDate(value.value)}」无法写入日期控件` };
       }
-      const date = value.kind === 'date' ? value.value : value.kind === 'endDate' ? value.value : null;
-      if (!date || !('year' in date)) return { ok: false, reasonCode: 'SOURCE_MISSING', message: '缺少日期' };
-      const text = toDateInputValue(date);
+      const rawDate = value.kind === 'date' ? value.value : value.kind === 'endDate' ? value.value : null;
+      if (!rawDate || !('year' in rawDate)) return { ok: false, reasonCode: 'SOURCE_MISSING', message: '缺少日期' };
+      const complete = dateWithDefaultDay(rawDate, catalogField);
+      const text = complete ? toDateInputValue(complete) : null;
       if (text === null) {
         return {
           ok: false,
           reasonCode: 'PRECISION_MISMATCH',
-          message: '网页要求精确到日，履历只记录到月份，不能补成 1 号',
+          message: '网页要求精确到日，但履历缺少月份',
         };
       }
       return { ok: true, value: text };
@@ -254,8 +280,9 @@ export function projectValue(
       if (value.kind === 'endDate' && isPresent(value.value)) {
         return { ok: false, reasonCode: 'REQUIRES_USER_ACTION', message: '「至今」无法写入月份控件' };
       }
-      const date = value.kind === 'date' ? value.value : value.kind === 'endDate' ? value.value : null;
-      if (!date || !('year' in date)) return { ok: false, reasonCode: 'SOURCE_MISSING', message: '缺少日期' };
+      const rawDate = value.kind === 'date' ? value.value : value.kind === 'endDate' ? value.value : null;
+      if (!rawDate || !('year' in rawDate)) return { ok: false, reasonCode: 'SOURCE_MISSING', message: '缺少日期' };
+      const date = dateWithDefaultMonth(rawDate, catalogField);
       const text = toMonthInputValue(date);
       if (text === null) {
         return { ok: false, reasonCode: 'PRECISION_MISMATCH', message: '履历只记录到年份，缺少月份' };

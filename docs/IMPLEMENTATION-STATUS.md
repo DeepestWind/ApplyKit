@@ -1,5 +1,12 @@
 # 实现状态
 
+## 2026-09-16 北森敏感资料与日期默认值
+
+- 履历 schema、编辑器和字段目录新增可选的证件号码、紧急联系人姓名、电话和关系。计划器只允许“字段白名单 + 专用站点适配器精确绑定”同时成立的敏感字段进入填写计划；通用别名、手动映射和未知站点仍会返回 `REQUIRES_USER_ACTION`。
+- 北森 Phoenix 已绑定证件号码、身份证号码、紧急联系人及联系电话等稳定标签。公开演示使用纯虚构资料，真实值只写入被 Git 忽略且权限为 `0600` 的私有履历文件。
+- 日期投影现在执行用户指定的默认值：教育开始日期为 9 月 1 日、教育毕业日期为 6 月 30 日，其他已知年月但缺少日的日期为当月 1 日；已有月、日不会被覆盖。
+- 内容脚本版本升至 v15。完整 `npm run verify` 通过：118 个单元测试、52 个扩展端到端场景全部成功；生产包 629.2 KiB，权限仍为 `activeTab, scripting, storage`。真实北森页面复验仍待完成。
+
 ## 2026-09-15 传音北森表单扩展
 
 - 在传音 `transsion.zhiye.com` 实页完成两轮只读诊断。旧版为 52 个已填写、4 个原值相同、79 个待处理、0 个失败；用户重载 v13 后达到 65 个已填写、4 个原值相同、66 个待处理、0 个失败，净增加 13 个自动填写项。
@@ -154,7 +161,7 @@
 | 识别伪下拉/日期选择器（`请选择` 占位符、`select`/`dropdown`/`picker` 容器），一律不写入 | `src/content/dom-utils.ts`、`src/content/scanner.ts` | `08-ats-style.spec.ts` |
 | 分区标题支持 `[class*="block-title"]` 等 CSS Modules 命名 | `src/content/sections.ts` | `08-ats-style.spec.ts` |
 | 同页「工作经历 / 实习经历」不再互相抢记录 | `src/content/sections.ts` | `08-ats-style.spec.ts` |
-| 敏感字段（证件号码、政治面貌等）显式标记，永不自动填写 | `src/content/scanner.ts`、`src/background/planner.ts` | `08-ats-style.spec.ts` |
+| 敏感字段默认拦截；v15 仅允许本地明确保存、字段白名单放行并由专用适配器精确绑定的证件/紧急联系人字段 | `src/content/scanner.ts`、`src/background/planner.ts` | `storage-planner.test.ts`、`08-ats-style.spec.ts`、`10-beisen-adapter.spec.ts` |
 | 网站锁定字段给出具体原因 | `src/content/scanner.ts` | `08-ats-style.spec.ts` |
 | 岗位候选启发式收紧，标题两边都不像岗位名时不给候选 | `src/content/job-posting.ts` | `matching.test.ts` |
 | 补充真实标签别名（所在地、职位名称、工作职责、职责、语言类型、自我描述等） | `src/shared/field-catalog.ts` | `08-ats-style.spec.ts` |

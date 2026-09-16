@@ -42,8 +42,8 @@ export interface ScanOutput {
 
 const DECLARATION_PATTERN = /(声明|承诺|同意|授权|隐私|条款|协议|保证|知情|真实性)/;
 /**
- * 敏感信息：计划书第 7.2 节明确不进入 P0 履历模型。
- * 这些字段一律列为待处理，绝不用别的字段代替，也不保存。
+ * 敏感信息默认列为待处理，绝不用别的字段代替。后台仅允许用户主动保存、
+ * 字段目录显式放行并由站点适配器精确绑定的少数字段继续填写。
  */
 const SENSITIVE_PATTERN = /(身份证|证件号|护照号|港澳|台胞证|社保|公积金|银行卡|银行账|开户行|政治面貌|民族|婚姻状况|健康状况|血型|残疾|宗教|户口|户籍所在地|家庭住址|详细地址|通讯地址|紧急联系|家庭成员|亲属|担保人|密码)/;
 const SKIPPED_INPUT_TYPES = new Set(['password', 'hidden', 'file', 'submit', 'reset', 'button', 'image']);
@@ -481,7 +481,7 @@ export function scanPage(options: ScanOptions): ScanOutput {
       : selectLike === 'date-picker' && !supportedDatePicker
         ? '这是网站自定义的日期选择器，扩展不会去点它的日历，请手动选择'
         : sensitive
-          ? '这类敏感信息不保存在履历里，也不会自动填写，请手动处理'
+          ? '敏感信息默认不自动填写；只有履历明确保存且当前站点经过精确适配时才会使用'
           : locked
             ? '网站锁定了这个字段（通常来自你的账号资料），只能在网站上修改'
             : (control.unsupportedReason ?? null);

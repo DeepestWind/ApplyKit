@@ -61,7 +61,7 @@ test('改变表单布局和标题样式仍复用相同组件，不依赖公司�
   expect((await state()).received.birth).toBe('2002-04-15');
 });
 
-test('用户添加经历后可重新识别整组，月精度资料不会被补成某一天', async () => {
+test('用户添加经历后可重新识别整组，教育开始日期按约定补为 9 月 1 日', async () => {
   await run();
   await page.locator('#add-education').click();
   const tab = await findDemoTab(app, 'component-controls.html');
@@ -69,8 +69,9 @@ test('用户添加经历后可重新识别整组，月精度资料不会被补�
   await expect(page.locator('[name="school"]')).toHaveValue('示例理工大学');
   await expect(page.locator('[name="major"]')).toHaveValue('软件工程');
   expect(outcomeOf(snapshot, '学历层次').outcome).toBe('filled');
-  expect(outcomeOf(snapshot, '入学日期').reasonCode).toBe('PRECISION_MISMATCH');
-  expect((await state()).opened.eduStart).toBeUndefined();
+  expect(outcomeOf(snapshot, '入学日期').outcome).toBe('filled');
+  expect((await state()).received.eduStart).toBe('2024-09-01');
+  expect((await state()).opened.eduStart).toBe(1);
   expect((await state()).adds).toBe(1);
 });
 

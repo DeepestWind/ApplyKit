@@ -144,9 +144,14 @@ export function planRun(options: PlanOptions): PlanResult {
       continue;
     }
     if (descriptor.sensitive) {
-      // 敏感信息不进入履历模型，任何情况下都不自动填写。
-      results.push(resultFor(descriptor, 'pending', 'REQUIRES_USER_ACTION'));
-      continue;
+      // 默认仍不碰敏感字段。只有用户主动保存在履历中的少数白名单字段，且
+      // 当前站点适配器给出明确绑定时才继续；通用别名和手动规则都不能放宽。
+      const explicit = adapterBindings.get(descriptor.fieldId);
+      const allowed = explicit ? getCatalogField(explicit.section, explicit.field)?.sensitiveAutofill === true : false;
+      if (!allowed) {
+        results.push(resultFor(descriptor, 'pending', 'REQUIRES_USER_ACTION'));
+        continue;
+      }
     }
     if (descriptor.disabled || descriptor.readOnly || !descriptor.visible) {
       results.push(resultFor(descriptor, 'pending', 'REQUIRES_USER_ACTION'));
@@ -157,6 +162,13 @@ export function planRun(options: PlanOptions): PlanResult {
     if (decision.kind === 'rejected') {
       results.push(resultFor(descriptor, 'pending', decision.reasonCode));
       continue;
+    }
+    if (descriptor.sensitive) {
+      const explicit = adapterBindings.get(descriptor.fieldId);
+      if (!explicit || decision.source.section !== explicit.section || decision.source.field !== explicit.field) {
+        results.push(resultFor(descriptor, 'pending', 'REQUIRES_USER_ACTION'));
+        continue;
+      }
     }
 
     const catalogField = getCatalogField(decision.source.section, decision.source.field);

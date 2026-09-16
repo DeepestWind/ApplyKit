@@ -120,6 +120,7 @@ function descriptor(options: {
   recordInstanceId?: string | null;
   empty?: boolean;
   datePart?: FieldDescriptor['datePart'];
+  sensitive?: boolean;
 }): FieldDescriptor {
   const section = options.section ?? 'unknown';
   const controlKind = options.controlKind ?? 'text';
@@ -148,7 +149,7 @@ function descriptor(options: {
     degreeHint: null,
     recordIdentityHint: null,
     unsupportedReason: null,
-    sensitive: false,
+    sensitive: options.sensitive ?? false,
   };
 }
 
@@ -205,6 +206,41 @@ describe('计划生成', () => {
     const descriptors = [descriptor({ fieldId: 'f1', label: '姓名', section: 'personal', empty: false })];
     const plan = planRun({ scan: scanOf(descriptors), profile: demoProfile, rules: [] });
     expect(plan.actions[0]?.overwrite).toBe(false);
+  });
+
+  it('敏感字段只有在站点适配器精确绑定且本地履历明确保存时才进入计划', () => {
+    const idField = descriptor({ fieldId: 'id-number', label: '证件号码', section: 'personal', sensitive: true });
+    const exact = planRun({
+      scan: scanOf([idField], {
+        adapterId: 'beisen-zhiye-phoenix',
+        adapterBindings: [{ fieldId: 'id-number', section: 'personal', field: 'identityNumber' }],
+      }),
+      profile: demoProfile,
+      rules: [],
+    });
+    expect(exact.actions).toEqual([
+      expect.objectContaining({ fieldId: 'id-number', value: '320000200001010000' }),
+    ]);
+
+    const generic = planRun({ scan: scanOf([idField]), profile: demoProfile, rules: [] });
+    expect(generic.actions).toEqual([]);
+    expect(generic.results).toEqual([
+      expect.objectContaining({ fieldId: 'id-number', reasonCode: 'REQUIRES_USER_ACTION' }),
+    ]);
+
+    const manualOverride = planRun({
+      scan: scanOf([idField], {
+        adapterId: 'beisen-zhiye-phoenix',
+        adapterBindings: [{ fieldId: 'id-number', section: 'personal', field: 'identityNumber' }],
+      }),
+      profile: demoProfile,
+      rules: [],
+      manualBindings: new Map([['id-number', { section: 'personal', field: 'email' }]]),
+    });
+    expect(manualOverride.actions).toEqual([]);
+    expect(manualOverride.results).toEqual([
+      expect.objectContaining({ fieldId: 'id-number', reasonCode: 'REQUIRES_USER_ACTION' }),
+    ]);
   });
 
   it('两段教育按学历层级分别绑定，不串位', () => {

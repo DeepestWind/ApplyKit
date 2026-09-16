@@ -23,7 +23,7 @@ export const reasonLabels: Record<ReasonCode, string> = {
   AMBIGUOUS_RECORD: '无法确定对应哪一段经历',
   AMBIGUOUS_OPTION: '找不到唯一对应的选项',
   UNSUPPORTED_WIDGET: '这种控件需要手动处理',
-  PRECISION_MISMATCH: '日期精度不足，不能补齐',
+  PRECISION_MISMATCH: '日期精度不足，无法按已配置的默认值补齐',
   TEXT_TOO_LONG: '内容超过网页字数限制',
   REQUIRES_USER_ACTION: '需要你自己确认或操作',
   STALE_PAGE: '页面结构已变化',
